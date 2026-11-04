@@ -18,13 +18,16 @@ const trainingPlanner = (() => {
   const sessionTemplate = document.querySelector("#plan-session-template");
   const exerciseTemplate = document.querySelector("#plan-exercise-template");
   const addDialog = document.querySelector("#plan-add-dialog");
+  const addTitle = document.querySelector("#plan-add-title");
+  const replaceContext = document.querySelector("#plan-replace-context");
   const addForm = document.querySelector("#plan-add-form");
+  const customExercise = addForm.closest("details");
   const addSearch = document.querySelector("#plan-add-search");
   const addGroup = document.querySelector("#plan-add-group");
   const addEquipment = document.querySelector("#plan-add-equipment");
   const addStatus = document.querySelector("#plan-add-status");
   const addResults = document.querySelector("#plan-add-results");
-  let activeSession;
+  let pickerTarget;
   let workspace;
   let localPlan = readLocal();
   let plan = localPlan;
@@ -110,6 +113,16 @@ const trainingPlanner = (() => {
     }
   }
 
+  function createPreview(exercise) {
+    const preview = document.createElement("span");
+    preview.className = "exercise-preview";
+    preview.setAttribute("aria-hidden", "true");
+    const illustration = exercise && exerciseIllustrations.create(exercise);
+    if (illustration) preview.append(illustration);
+    else preview.innerHTML = '<svg><use href="#icon-strength"/></svg>';
+    return preview;
+  }
+
   function renderExercise(entry, sessionIndex, index, time) {
     const item = exerciseTemplate.content.firstElementChild.cloneNode(true);
     const session = plan.sessions[sessionIndex];
@@ -118,6 +131,7 @@ const trainingPlanner = (() => {
     item.dataset.exerciseIndex = index;
     item.querySelector("strong").textContent = name;
     item.querySelector(".exercise-meta").textContent = exercise?.type ?? (entry.equipment || "Eigene Übung");
+    item.querySelector(".plan-exercise-label").prepend(createPreview(exercise));
     for (const field of item.querySelectorAll("input")) {
       field.value = entry[field.name];
       field.setAttribute("aria-label", `${field.name === "sets" ? "Sätze" : "Wiederholungen"} für ${name}`);
@@ -134,6 +148,9 @@ const trainingPlanner = (() => {
     const row = `[data-session-index="${sessionIndex}"]`;
     bindOrder(item, "plan-exercise", session.exercises, index,
       (target, action) => `${row} [data-exercise-index="${target}"] .plan-exercise-${action}`, name);
+    const replace = item.querySelector(".plan-exercise-replace");
+    replace.setAttribute("aria-label", `${name} austauschen`);
+    replace.addEventListener("click", () => openExercisePicker(session, entry));
     const remove = item.querySelector(".plan-remove");
     remove.setAttribute("aria-label", `${name} entfernen`);
     remove.addEventListener("click", () => {
@@ -144,17 +161,22 @@ const trainingPlanner = (() => {
     return item;
   }
 
-  function openExercisePicker(session) {
-    if (session.exercises.length >= limits.exercises) {
+  function openExercisePicker(session, entry = null) {
+    if (!entry && session.exercises.length >= limits.exercises) {
       status.textContent = "Diese Einheit hat die maximale Anzahl Übungen erreicht.";
       return;
     }
-    activeSession = session;
+    pickerTarget = { session, entry };
+    const exercise = catalog.get(entry?.id);
+    addTitle.textContent = entry ? "Übung austauschen" : "Übung hinzufügen";
+    replaceContext.hidden = !entry;
+    replaceContext.textContent = entry ? `Ersatz für ${exercise?.name ?? entry.name}` : "";
     addSearch.value = "";
-    addGroup.value = "";
+    addGroup.value = exercise?.group ?? "";
     addEquipment.value = "";
     addForm.reset();
-    addForm.closest("details").open = false;
+    customExercise.open = false;
+    customExercise.hidden = Boolean(entry);
     renderPicker();
     addDialog.showModal();
     addDialog.scrollTop = 0;
@@ -226,23 +248,38 @@ const trainingPlanner = (() => {
     }
   }
 
-  function addExercise(entry) {
-    const index = plan.sessions.indexOf(activeSession);
-    if (index < 0 || activeSession.exercises.length >= limits.exercises) return;
-    activeSession.exercises.push({ ...entry, sets: 3, reps: 10 });
+  function selectExercise(choice) {
+    if (!addDialog.open) return;
+    const { session, entry } = pickerTarget;
+    const sessionIndex = plan?.sessions.indexOf(session) ?? -1;
+    if (sessionIndex < 0) return;
+    const row = `[data-session-index="${sessionIndex}"]`;
+    let focusSelector = `${row} .plan-add-button`;
+    if (entry) {
+      const exerciseIndex = session.exercises.indexOf(entry);
+      if (exerciseIndex < 0 || choice.id === entry.id) return;
+      session.exercises[exerciseIndex] = { ...choice, sets: entry.sets, reps: entry.reps };
+      focusSelector = `${row} [data-exercise-index="${exerciseIndex}"] .plan-exercise-replace`;
+    } else {
+      if (session.exercises.length >= limits.exercises) return;
+      session.exercises.push({ ...choice, sets: 3, reps: 10 });
+    }
     addDialog.close();
-    renderPlan(`[data-session-index="${index}"] .plan-add-button`);
-    save("Übung hinzugefügt.");
+    renderPlan(focusSelector);
+    save(entry ? "Übung ausgetauscht." : "Übung hinzugefügt.");
   }
 
   function renderPicker() {
-    const matches = find(addSearch.value, addGroup.value, addEquipment.value);
+    const entry = pickerTarget?.entry;
+    const matches = find(addSearch.value, addGroup.value, addEquipment.value)
+      .filter((exercise) => exercise.id !== entry?.id);
     addStatus.textContent = matches.length === 1 ? "1 Übung" : `${matches.length} Übungen`;
     addResults.replaceChildren();
     if (!matches.length) {
       const empty = document.createElement("p");
       empty.className = "planner-note";
-      empty.textContent = "Keine passende Übung gefunden. Ändere die Filter oder lege eine eigene Übung an.";
+      empty.textContent = entry ? "Keine passende Übung gefunden. Ändere die Suche oder die Filter."
+        : "Keine passende Übung gefunden. Ändere die Filter oder lege eine eigene Übung an.";
       addResults.append(empty);
     }
     for (const group of groups) {
@@ -256,10 +293,11 @@ const trainingPlanner = (() => {
         const item = document.querySelector("#exercise-template").content.cloneNode(true);
         const button = item.querySelector("button");
         button.removeAttribute("aria-haspopup");
+        button.prepend(createPreview(exercise));
         item.querySelector("strong").textContent = exercise.name;
         item.querySelector(".exercise-meta").textContent = exercise.type;
-        item.querySelector(".arrow use").setAttribute("href", "#icon-plus");
-        button.addEventListener("click", () => addExercise({ id: exercise.id }));
+        item.querySelector(".arrow use").setAttribute("href", entry ? "#icon-swap" : "#icon-plus");
+        button.addEventListener("click", () => selectExercise({ id: exercise.id }));
         list.append(item);
       }
       addResults.append(heading, list);
@@ -360,13 +398,14 @@ const trainingPlanner = (() => {
   addEquipment.addEventListener("change", renderPicker);
   addForm.addEventListener("submit", (event) => {
     event.preventDefault();
+    if (customExercise.hidden) return;
     const name = addForm.elements.custom.value.trim();
     if (!name) {
       addForm.elements.custom.value = "";
       addForm.reportValidity();
       return;
     }
-    addExercise({ name, equipment: addForm.elements.customEquipment.value });
+    selectExercise({ name, equipment: addForm.elements.customEquipment.value });
   });
 
   settings.addEventListener("submit", (event) => {

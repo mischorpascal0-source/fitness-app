@@ -26,6 +26,7 @@
     <symbol id="icon-steps" viewBox="0 0 24 24"><path d="M10 7c0 3-2 5-4 5S3 10 3 8s1-5 3-5 4 2 4 4Zm-6 8h5v2a2.5 2.5 0 0 1-5 0zm10-2c0 3 2 5 4 5s3-2 3-4-1-5-3-5-4 2-4 4Zm1 8h5"/></symbol>
     <symbol id="icon-flame" viewBox="0 0 24 24"><path d="M12 22a7 7 0 0 0 7-7c0-4-3-7-5-9 0 3-2 4-2 4 0-4-3-7-3-7 0 5-4 7-4 12a7 7 0 0 0 7 7Z"/><path d="M12 22a3 3 0 0 0 3-3c0-2-3-4-3-4s-3 2-3 4a3 3 0 0 0 3 3Z"/></symbol>
     <symbol id="icon-arrow" viewBox="0 0 24 24"><path d="M4 12h15m-6-6 6 6-6 6"/></symbol>
+    <symbol id="icon-swap" viewBox="0 0 24 24"><path d="M3 8h17m-4-4 4 4-4 4m5 4H4m4-4-4 4 4 4"/></symbol>
     <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5 5"/></symbol>
     <symbol id="icon-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
     <symbol id="icon-rest" viewBox="0 0 24 24"><path d="M20.4 15.1A8.5 8.5 0 0 1 8.9 3.6a8.5 8.5 0 1 0 11.5 11.5Z"/></symbol>
@@ -242,6 +243,7 @@
       <h2 id="plan-add-title">Übung hinzufügen</h2>
       <button class="plan-button" id="plan-add-close" type="button" autofocus>Schließen</button>
     </div>
+    <p id="plan-replace-context" class="planner-note" hidden></p>
     <details class="custom-exercise">
       <summary>Eigene Übung hinzufügen</summary>
       <form id="plan-add-form" class="library-controls">
@@ -276,14 +278,21 @@
   </template>
   <template id="plan-exercise-template">
     <li class="plan-exercise">
-      <div><strong></strong><p class="exercise-meta"></p></div>
-      <div class="plan-exercise-controls">
-        <label>Sätze <input name="sets" type="number" min="1" max="10" step="1" required></label>
-        <label>Wdh. <input name="reps" type="number" min="1" max="100" step="1" required></label>
-        <button class="plan-button plan-exercise-up" type="button">↑</button>
-        <button class="plan-button plan-exercise-down" type="button">↓</button>
-        <button class="plan-button plan-remove" type="button">Entfernen</button>
+      <div class="plan-exercise-content">
+        <div class="plan-exercise-label"><div><strong></strong><p class="exercise-meta"></p></div></div>
+        <div class="plan-exercise-controls">
+          <label>Sätze <input name="sets" type="number" min="1" max="10" step="1" required></label>
+          <label>Wdh. <input name="reps" type="number" min="1" max="100" step="1" required></label>
+          <div class="plan-order-controls">
+            <button class="plan-button plan-exercise-up" type="button">↑</button>
+            <button class="plan-button plan-exercise-down" type="button">↓</button>
+            <button class="plan-button plan-remove" type="button">Entfernen</button>
+          </div>
+        </div>
       </div>
+      <button class="plan-button plan-exercise-replace" type="button" aria-haspopup="dialog" title="Übung austauschen">
+        <svg aria-hidden="true"><use href="#icon-swap"/></svg>
+      </button>
     </li>
   </template>
   <template id="exercise-template">

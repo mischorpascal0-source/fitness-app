@@ -541,14 +541,40 @@ a.plan-button { display: inline-flex; align-items: center; text-decoration: none
 .plan-result-header label { width: 100%; }
 .plan-exercises { margin: 0; padding: 0; list-style: none; }
 .plan-exercise {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+
+.plan-exercise-content {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
-  padding: var(--space-3) 0;
-  border-top: 1px solid var(--border);
-  overflow-wrap: anywhere;
+}
+.plan-exercise-label { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.exercise-preview {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 3.5rem;
+  aspect-ratio: 240 / 174;
+  color: var(--muted);
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: var(--space-2);
+}
+.plan-exercise-replace {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  padding: 0;
+  color: var(--accent);
 }
 
 .plan-exercise-controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-2); }
@@ -585,6 +611,7 @@ a.plan-button { display: inline-flex; align-items: center; text-decoration: none
 .plan-duration input { width: 100%; min-height: 2.75rem; margin: 0; accent-color: var(--accent); cursor: pointer; }
 #plan-settings-status:not(:empty) { margin-top: var(--space-2); color: var(--accent); }
 .custom-exercise { margin-bottom: var(--space-3); padding: 0 var(--space-3) var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-control); }
+#plan-add-title { font-size: var(--text-section); }
 #plan-add-filters input { padding-inline-start: var(--space-3); }
 #plan-add-results h3 { margin-block: var(--space-3) var(--space-1); }
 #plan-add-results .exercise-grid { grid-template-columns: minmax(0, 1fr); }
