@@ -380,7 +380,7 @@ a.workout:hover, .exercise-card:hover, .detail-close:hover { border-color: var(-
 
 html:has(dialog[open]) { overflow: hidden; }
 
-#exercise-detail, #plan-add-dialog, #plan-settings-dialog {
+:is(#exercise-detail, #plan-add-dialog, #plan-settings-dialog, #strength-workout-dialog) {
   --dialog-padding: clamp(1rem, 4vw, 1.625rem);
   width: min(calc(100% - 1.5rem), 36rem);
   max-height: calc(100dvh - max(1.5rem, env(safe-area-inset-top)) - max(1.5rem, env(safe-area-inset-bottom)));
@@ -394,7 +394,7 @@ html:has(dialog[open]) { overflow: hidden; }
   border-radius: var(--radius-card);
 }
 
-#exercise-detail::backdrop, #plan-add-dialog::backdrop, #plan-settings-dialog::backdrop { background: var(--backdrop); }
+:is(#exercise-detail, #plan-add-dialog, #plan-settings-dialog, #strength-workout-dialog)::backdrop { background: var(--backdrop); }
 
 .detail-header {
   position: sticky;
@@ -481,7 +481,6 @@ html:has(dialog[open]) { overflow: hidden; }
 #detail-steps li + li { margin-top: var(--space-2); }
 #detail-steps li::marker { color: var(--accent); font-weight: 750; }
 
-.planner-link { margin-bottom: var(--space-4); }
 .text-link { display: inline-block; margin-bottom: var(--space-3); color: var(--accent); }
 
 .planner-settings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -544,7 +543,7 @@ a.plan-button { display: inline-flex; align-items: center; text-decoration: none
 .plan-exercise {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas: "label swap" "controls controls";
+  grid-template-areas: "label swap" "controls remove";
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-3) 0;
@@ -570,6 +569,7 @@ a.plan-button { display: inline-flex; align-items: center; text-decoration: none
   padding: 0;
 }
 .plan-exercise-replace { grid-area: swap; color: var(--accent); }
+.plan-remove { grid-area: remove; justify-self: end; align-self: end; }
 .plan-exercise-grip:enabled { cursor: grab; touch-action: none; user-select: none; }
 .plan-exercise.is-dragging {
   position: relative;
@@ -587,26 +587,28 @@ a.plan-button { display: inline-flex; align-items: center; text-decoration: none
   align-items: end;
   gap: var(--space-1);
 }
-.plan-exercise-controls .plan-order-controls { justify-self: end; flex-wrap: nowrap; }
+.plan-exercise-grip { justify-self: end; }
 .plan-exercise-controls label { display: grid; gap: var(--space-1); color: var(--muted); font-size: var(--text-small); }
 .plan-exercise input { width: 100%; min-width: 0; padding-inline: var(--space-1); }
 
 @media (min-width: 50rem) {
   .plan-exercise {
-    grid-template-columns: minmax(0, 1fr) auto auto;
-    grid-template-areas: "label controls swap";
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
+    grid-template-areas: "label controls swap remove";
   }
+  .plan-remove { align-self: center; }
   .plan-exercise-controls { grid-template-columns: repeat(3, auto); align-items: center; gap: var(--space-2); }
   .plan-exercise-controls label { grid-template-columns: auto 3.75rem; align-items: center; }
 }
 
 .plan-add-button { margin-top: var(--space-2); }
+.plan-session-day { max-width: 16rem; margin-bottom: var(--space-3); }
+.planner-links { display: flex; flex-wrap: wrap; gap: var(--space-3); }
 #plan-add-form { grid-template-columns: minmax(0, 1fr); }
 #plan-add-form input { padding-inline-start: var(--space-3); }
 
 #plan-manual-form, #plan-notices { margin-top: var(--space-3); }
 #plan-result:focus { outline: none; }
-#plan-manual-form .library-controls { align-items: end; }
 #plan-notices { margin-bottom: var(--space-3); }
 #plan-notices ul { margin-block: var(--space-2); padding-inline-start: var(--space-5); }
 .plan-equipment { margin-top: var(--space-3); }
@@ -614,6 +616,50 @@ a.plan-button { display: inline-flex; align-items: center; text-decoration: none
 .plan-equipment-options { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-2); }
 .plan-equipment-options label { display: flex; align-items: center; min-height: 2.75rem; padding-inline: var(--space-2); gap: var(--space-1); border: 1px solid var(--border); border-radius: var(--radius-control); cursor: pointer; }
 .plan-equipment-options input { accent-color: var(--accent); }
+
+.training-days, .workout-sets {
+  min-width: 0;
+  margin: var(--space-4) 0 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+}
+.training-days legend, .workout-sets legend {
+  max-width: 100%;
+  padding-inline: var(--space-1);
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.workout-sets .plan-equipment-options { margin-block: var(--space-2) 0; }
+
+#strength-dashboard:not([hidden]) { display: grid; gap: var(--space-3); }
+#strength-session-field[hidden] { display: none; }
+#strength-schedule, #strength-workout-title { overflow-wrap: anywhere; }
+#strength-schedule, #strength-session-field, #strength-status:not(:empty),
+#strength-workout-status, #strength-week-empty { margin-top: var(--space-2); }
+#strength-workout-title { font-size: var(--text-section); }
+.strength-totals {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: var(--space-4) 0;
+}
+.strength-totals > div {
+  padding: var(--space-3);
+  background: var(--raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+}
+.strength-totals dt { color: var(--muted); font-size: var(--text-small); }
+.strength-totals dd { margin: 0; color: var(--accent); font-size: 1.5rem; font-weight: 750; }
+#strength-muscle-sets { margin: 0; padding: 0; list-style: none; }
+#strength-muscle-sets li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-1) var(--space-3);
+  margin-top: var(--space-3);
+}
+#strength-muscle-sets progress { grid-column: 1 / -1; width: 100%; }
 
 #plan-settings-dialog { box-shadow: 0 1rem 3rem rgb(0 0 0 / .38); }
 #plan-settings-title { font-size: var(--text-section); }

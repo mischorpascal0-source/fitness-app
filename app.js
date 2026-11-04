@@ -1,12 +1,6 @@
 const sampleData = {
   steps: { value: 6420, goal: 8000 },
   calorieIntake: { value: 1480, goal: 2200 },
-  weeklyPlan: {
-    1: { name: "Unterkörper", category: "krafttraining", minutes: 50 },
-    2: { name: "Oberkörper", category: "krafttraining", minutes: 45 },
-    4: { name: "Grundlagenausdauer", category: "cardio", minutes: 35 },
-    6: { name: "Ganzkörper", category: "krafttraining", minutes: 45 },
-  },
 };
 
 const number = new Intl.NumberFormat("de-DE");
@@ -16,6 +10,7 @@ const appShell = document.querySelector("#main");
 const heading = document.querySelector("#page-title");
 const home = document.querySelector("#home-view");
 const category = document.querySelector("#category");
+const strength = document.querySelector("#strength-dashboard");
 const library = document.querySelector("#exercise-library");
 const planner = document.querySelector("#training-planner");
 const exerciseDetail = document.querySelector("#exercise-detail");
@@ -39,41 +34,50 @@ function renderToday() {
 
   date.dateTime = dateKey;
   date.textContent = dateFormat.format(now);
-  const training = sampleData.weeklyPlan[now.getDay()];
+  strengthDashboard.render();
+  renderScheduledTraining(now);
+}
+
+function renderScheduledTraining(now = new Date()) {
+  const weekday = (now.getDay() + 6) % 7;
+  const sessions = trainingPlanner.getPlan()?.sessions.filter((session) => session.weekday === weekday) ?? [];
   const container = document.querySelector("#training-card");
-  if (!training) {
+  if (!sessions.length) {
     container.replaceChildren(document.querySelector("#rest-template").content.cloneNode(true));
     return;
   }
 
   const card = document.querySelector("#training-template").content.firstElementChild.cloneNode(true);
-  const destination = links.find((link) => link.hash === "#" + training.category);
-  card.href = destination.hash;
-  card.querySelector("h3").textContent = training.name;
-  card.querySelector("p").textContent = `${destination.dataset.title} · ${training.minutes} Min.`;
-  card.querySelector(".icon-tile use").setAttribute("href", training.category === "cardio" ? "#icon-cardio" : "#icon-strength");
+  card.href = "#krafttraining";
+  card.querySelector("h3").textContent = sessions.map(({ name }) => name).join(" · ");
+  card.querySelector("p").textContent = "Zum Krafttraining";
   container.replaceChildren(card);
 }
 
 function renderRoute(focusHeading = false) {
   if (appShell.hidden) return;
   const isPlanner = location.hash === "#trainingsplan";
-  const navHash = isPlanner ? "#krafttraining" : location.hash;
+  const showLibrary = location.hash === "#uebungen";
+  const navHash = isPlanner || showLibrary ? "#krafttraining" : location.hash;
   const active = links.find((link) => link.hash === navHash) ?? links[0];
   const isHome = active === links[0];
   const isStrength = active.hash === "#krafttraining";
-  const showLibrary = isStrength && !isPlanner;
+  const showStrength = isStrength && !isPlanner && !showLibrary;
   if (!showLibrary && exerciseDetail.open) exerciseDetail.close();
   if (!isPlanner) trainingPlanner.closeDialogs();
+  if (!showStrength) strengthDashboard.close();
   home.hidden = !isHome;
+  if (isHome) renderScheduledTraining();
   date.hidden = !isHome;
   library.hidden = !showLibrary;
+  strength.hidden = !showStrength;
+  if (showStrength) strengthDashboard.render();
   planner.hidden = !isPlanner;
   category.hidden = isHome || isStrength;
   if (!category.hidden) {
     category.querySelector("use").setAttribute("href", active.querySelector("use").getAttribute("href"));
   }
-  heading.textContent = isPlanner ? "Trainingsplan" : active.dataset.title;
+  heading.textContent = isPlanner ? "Trainingsplan" : showLibrary ? "Übungsbibliothek" : active.dataset.title;
   document.title = `${heading.textContent} · Fitness-App`;
   for (const link of links) {
     if (link === active) link.setAttribute("aria-current", "page");
@@ -89,6 +93,7 @@ renderMetric("steps", sampleData.steps, "", "Ziel ");
 renderMetric("calories", sampleData.calorieIntake, " kcal", "Ziel ");
 renderToday();
 renderRoute();
+document.addEventListener("fitness:planchange", () => { if (!home.hidden) renderScheduledTraining(); });
 window.addEventListener("hashchange", () => renderRoute(true));
 window.addEventListener("focus", renderToday);
 window.setInterval(renderToday, 60_000);

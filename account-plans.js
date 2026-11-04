@@ -130,6 +130,7 @@
     appShell.hidden = !signedIn;
     navigation.hidden = !signedIn;
     userLabel.textContent = account ? `Angemeldet als ${account.username}` : "";
+    strengthDashboard.setAccount(account?.id);
     trainingPlanner.setWorkspace(workspace, null);
     renderPlanSelect();
     if (account) {

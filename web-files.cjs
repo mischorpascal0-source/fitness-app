@@ -1,6 +1,6 @@
 const scripts = [
   "app.js", "exercises.js", "exercise-scenes.js", "exercise-illustrations.js", "catalog-search.js",
-  "exercise-library.js", "plan-data.js", "plan-generator.js", "training-planner.js", "account-plans.js",
+  "exercise-library.js", "plan-data.js", "plan-generator.js", "training-planner.js", "strength-dashboard.js", "account-plans.js",
 ];
 
 module.exports = [

@@ -1,5 +1,5 @@
 const trainingPlanner = (() => {
-  const { splits, goals, levels, equipment, limits, sessionTime, estimateMinutes, normalizePlan } = trainingPlanData;
+  const { splits, goals, levels, equipment, weekdays, limits, sessionTime, estimateMinutes, normalizePlan } = trainingPlanData;
   const { groups, find } = catalogSearch;
   const storageKey = "fitness-app.training-plan.v2";
   const legacyKey = "fitness-app.training-plan.v1";
@@ -9,8 +9,10 @@ const trainingPlanner = (() => {
   const settingsStatus = document.querySelector("#plan-settings-status");
   const durationOutput = document.querySelector("#plan-minutes-value");
   const { split, days, goal, level, minutes } = settings.elements;
+  const weekdayOptions = document.querySelector("#plan-weekdays");
+  const weekdayHint = document.querySelector("#plan-weekdays-hint");
   const manualForm = document.querySelector("#plan-manual-form");
-  const equipmentOptions = settings.querySelector(".plan-equipment-options");
+  const equipmentOptions = settings.querySelector(".plan-equipment .plan-equipment-options");
   const equipmentCount = settings.querySelector("#plan-equipment-count");
   const status = document.querySelector("#plan-status");
   const notices = document.querySelector("#plan-notices");
@@ -40,6 +42,35 @@ const trainingPlanner = (() => {
 
   function updateDays() {
     days.replaceChildren(...splits[split.value].days.map((day) => new Option(String(day), String(day))));
+    updateWeekdayHint();
+  }
+
+  function checkedWeekdays(container) {
+    return [...container.querySelectorAll(":checked")].map((input) => Number(input.value));
+  }
+
+  function fillWeekdayOptions(container) {
+    weekdays.forEach((day, index) => {
+      const label = document.createElement("label");
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.value = index;
+      label.append(input, day);
+      container.append(label);
+    });
+  }
+
+  function updateWeekdayHint() {
+    const selected = weekdayOptions.querySelectorAll(":checked").length;
+    weekdayHint.textContent = `Wähle ${days.value} Wochentage. ${selected} ausgewählt.`;
+  }
+
+  function applyWeekdays() {
+    const scheduled = new Set(plan?.sessions.map((session) => session.weekday));
+    for (const input of weekdayOptions.querySelectorAll("input")) {
+      input.checked = scheduled.has(Number(input.value));
+    }
+    updateWeekdayHint();
   }
 
   function formatMinutes(value) {
@@ -298,6 +329,7 @@ const trainingPlanner = (() => {
 
   function renderPlan(focusSelector, focusOptions) {
     finishExerciseDrag();
+    document.dispatchEvent(new Event("fitness:planchange"));
     result.replaceChildren();
     if (!plan) return;
     const header = document.createElement("div");
@@ -340,6 +372,17 @@ const trainingPlanner = (() => {
       card.dataset.sessionIndex = index;
       card.querySelector(".session-label").textContent = `Einheit ${index + 1}`;
       watchName(card.querySelector(".plan-session-name"), session, `Name der Einheit ${index + 1}`);
+      const weekday = card.querySelector(".plan-session-weekday");
+      weekday.add(new Option("Ohne festen Tag", ""));
+      fillSelect(weekday, weekdays.map((label, value) => [value, label]));
+      weekday.value = session.weekday ?? "";
+      weekday.setAttribute("aria-label", `Trainingstag für Einheit ${index + 1}`);
+      weekday.addEventListener("change", () => {
+        if (weekday.value === "") delete session.weekday;
+        else session.weekday = Number(weekday.value);
+        applyWeekdays();
+        save("Trainingstag gespeichert.");
+      });
       const list = card.querySelector("ul");
       const time = card.querySelector(".plan-session-time");
       renderSessionTime(time, session);
@@ -451,6 +494,7 @@ const trainingPlanner = (() => {
       }
     }
     plan = nextPlan;
+    applyWeekdays();
     renderPlan();
     renderNotices(messages);
     if (!workspace) save("Trainingsplan gespeichert.");
@@ -473,6 +517,12 @@ const trainingPlanner = (() => {
   fillSelect(addGroup, groups.map((group) => [group, group]));
   fillSelect(addEquipment, equipment.map((type) => [type, type]));
   fillSelect(addForm.elements.customEquipment, equipment.map((type) => [type, type]));
+
+  const manualWeekdays = document.querySelector("#plan-manual-weekdays");
+  fillWeekdayOptions(weekdayOptions);
+  fillWeekdayOptions(manualWeekdays);
+  weekdayOptions.addEventListener("change", updateWeekdayHint);
+  days.addEventListener("change", updateWeekdayHint);
 
   for (const type of equipment) {
     const label = document.createElement("label");
@@ -500,6 +550,7 @@ const trainingPlanner = (() => {
     updateDuration();
     updateDays();
     if (options) days.value = String(options.days);
+    applyWeekdays();
     for (const input of equipmentOptions.querySelectorAll("input")) {
       input.checked = !options || options.equipment.includes(input.value);
     }
@@ -533,6 +584,12 @@ const trainingPlanner = (() => {
       split: split.value, days: Number(days.value), goal: goal.value, level: level.value,
       minutes: minutes.valueAsNumber, equipment: selected,
     };
+    const trainingDays = checkedWeekdays(weekdayOptions);
+    if (trainingDays.length !== options.days) {
+      settingsStatus.textContent = `Wähle genau ${options.days} Trainingstage aus.`;
+      weekdayOptions.querySelector("input").focus();
+      return;
+    }
     const generated = generateTrainingPlan(options, plan);
     if (!generated) {
       settingsStatus.textContent = "Wähle mindestens einen Equipment-Typ aus.";
@@ -540,6 +597,7 @@ const trainingPlanner = (() => {
       equipmentOptions.querySelector("input").focus();
       return;
     }
+    generated.plan.sessions.forEach((session, index) => { session.weekday = trainingDays[index]; });
     createPlan(generated.plan, generated.notices, settingsStatus);
   });
 
@@ -552,7 +610,9 @@ const trainingPlanner = (() => {
       manualForm.reportValidity();
       return;
     }
-    createPlan({ name, options: null, sessions: [] });
+    const sessions = checkedWeekdays(manualWeekdays).map((weekday, index) =>
+      ({ name: `Einheit ${index + 1}`, weekday, exercises: [] }));
+    createPlan({ name, options: null, sessions });
   });
 
   function exportPlan(value) {
@@ -572,6 +632,7 @@ const trainingPlanner = (() => {
   }
 
   return {
+    getPlan: () => plan,
     getLocalPlan: () => localPlan,
     exportLocalPlan: () => exportPlan(localPlan),
     focusPlan,

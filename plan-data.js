@@ -9,6 +9,7 @@ const trainingPlanData = (() => {
   };
   const goals = { muscle: "Muskelaufbau", strength: "Kraft", fitness: "Allgemeine Fitness" };
   const levels = { beginner: "Einsteiger", intermediate: "Fortgeschritten" };
+  const weekdays = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
   const limits = { name: 100, sessions: 20, exercises: 40, sets: 10, reps: 100 };
   const sessionTime = { min: 20, max: 120, step: 5, defaultMinutes: 45, setMinutes: 1, restMinutes: 3 };
 
@@ -52,12 +53,16 @@ const trainingPlanData = (() => {
           return null;
         }
       }
-      sessions.push({ name: session.name.trim(), exercises });
+      const normalized = { name: session.name.trim(), exercises };
+      if (Number.isInteger(session.weekday) && session.weekday >= 0 && session.weekday < weekdays.length) {
+        normalized.weekday = session.weekday;
+      }
+      sessions.push(normalized);
     }
     return { name: name.trim(), options, sessions };
   }
 
-  return { splits, goals, levels, equipment, limits, sessionTime, estimateMinutes, normalizeOptions, normalizePlan };
+  return { splits, goals, levels, equipment, weekdays, limits, sessionTime, estimateMinutes, normalizeOptions, normalizePlan };
 })();
 
 if (typeof module !== "undefined") module.exports = trainingPlanData;
