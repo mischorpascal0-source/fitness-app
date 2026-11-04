@@ -54,7 +54,9 @@
         const item = template.content.cloneNode(true);
         const button = item.querySelector("button");
         button.dataset.exerciseId = exercise.id;
-        item.querySelector("strong").textContent = exercise.name;
+        const name = item.querySelector(".exercise-name");
+        name.textContent = exercise.name;
+        name.title = exercise.name;
         item.querySelector(".exercise-meta").textContent = `${exercise.group} · ${exercise.type}`;
         button.addEventListener("click", () => showDetail(exercise));
         list.append(item);

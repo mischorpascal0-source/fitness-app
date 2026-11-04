@@ -129,7 +129,9 @@ const trainingPlanner = (() => {
     const exercise = catalog.get(entry.id);
     const name = exercise?.name ?? entry.name;
     item.dataset.exerciseIndex = index;
-    item.querySelector("strong").textContent = name;
+    const nameLabel = item.querySelector(".exercise-name");
+    nameLabel.textContent = name;
+    nameLabel.title = name;
     item.querySelector(".exercise-meta").textContent = exercise?.type ?? (entry.equipment || "Eigene Übung");
     item.querySelector(".plan-exercise-label").prepend(createPreview(exercise));
     for (const field of item.querySelectorAll("input")) {
@@ -294,7 +296,9 @@ const trainingPlanner = (() => {
         const button = item.querySelector("button");
         button.removeAttribute("aria-haspopup");
         button.prepend(createPreview(exercise));
-        item.querySelector("strong").textContent = exercise.name;
+        const nameLabel = item.querySelector(".exercise-name");
+        nameLabel.textContent = exercise.name;
+        nameLabel.title = exercise.name;
         item.querySelector(".exercise-meta").textContent = exercise.type;
         item.querySelector(".arrow use").setAttribute("href", entry ? "#icon-swap" : "#icon-plus");
         button.addEventListener("click", () => selectExercise({ id: exercise.id }));

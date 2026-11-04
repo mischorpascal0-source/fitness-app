@@ -367,6 +367,7 @@ a.workout:hover, .exercise-card:hover, .detail-close:hover { border-color: var(-
 }
 
 .exercise-card-text { display: grid; gap: .125rem; min-width: 0; overflow-wrap: anywhere; }
+.exercise-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .exercise-card strong { font-size: .9375rem; }
 .exercise-meta { color: var(--muted); font-size: var(--text-small); }
 .arrow { margin-left: auto; color: var(--accent); }
@@ -543,21 +544,14 @@ a.plan-button { display: inline-flex; align-items: center; text-decoration: none
 .plan-exercise {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "label swap" "controls controls";
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-3) 0;
   border-top: 1px solid var(--border);
-  overflow-wrap: anywhere;
 }
 
-.plan-exercise-content {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-}
-.plan-exercise-label { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.plan-exercise-label { grid-area: label; display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
 .exercise-preview {
   display: grid;
   place-items: center;
@@ -569,17 +563,33 @@ a.plan-button { display: inline-flex; align-items: center; text-decoration: none
   border: 1px solid var(--border);
   border-radius: var(--space-2);
 }
-.plan-exercise-replace {
+.plan-exercise-replace, .plan-remove {
   display: grid;
   place-items: center;
   width: 2.75rem;
   padding: 0;
-  color: var(--accent);
+}
+.plan-exercise-replace { grid-area: swap; color: var(--accent); }
+.plan-exercise-controls {
+  grid-area: controls;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 3.75rem)) minmax(max-content, 1fr);
+  align-items: end;
+  gap: var(--space-1);
+}
+.plan-exercise-controls .plan-order-controls { justify-self: end; flex-wrap: nowrap; }
+.plan-exercise-controls label { display: grid; gap: var(--space-1); color: var(--muted); font-size: var(--text-small); }
+.plan-exercise input { width: 100%; min-width: 0; padding-inline: var(--space-1); }
+
+@media (min-width: 50rem) {
+  .plan-exercise {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas: "label controls swap";
+  }
+  .plan-exercise-controls { grid-template-columns: repeat(3, auto); align-items: center; gap: var(--space-2); }
+  .plan-exercise-controls label { grid-template-columns: auto 3.75rem; align-items: center; }
 }
 
-.plan-exercise-controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-2); }
-.plan-exercise-controls label { display: grid; gap: var(--space-1); color: var(--muted); font-size: var(--text-small); }
-.plan-exercise input { width: 3.75rem; padding-inline: var(--space-2); }
 .plan-add-button { margin-top: var(--space-2); }
 #plan-add-form { grid-template-columns: minmax(0, 1fr); }
 #plan-add-form input { padding-inline-start: var(--space-3); }
@@ -612,6 +622,7 @@ a.plan-button { display: inline-flex; align-items: center; text-decoration: none
 #plan-settings-status:not(:empty) { margin-top: var(--space-2); color: var(--accent); }
 .custom-exercise { margin-bottom: var(--space-3); padding: 0 var(--space-3) var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-control); }
 #plan-add-title { font-size: var(--text-section); }
+#plan-replace-context { overflow-wrap: anywhere; }
 #plan-add-filters input { padding-inline-start: var(--space-3); }
 #plan-add-results h3 { margin-block: var(--space-3) var(--space-1); }
 #plan-add-results .exercise-grid { grid-template-columns: minmax(0, 1fr); }
