@@ -1,4 +1,9 @@
 # Miscellaneous
+.env
+.env.*
+/.data/
+/.vercel/
+/.vercel-static/
 *.class
 *.lock
 *.log

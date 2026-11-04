@@ -1,0 +1,55 @@
+const trainingPlanData = (() => {
+  const catalog = typeof module === "undefined" ? exerciseCatalog : require("./exercises.js");
+  const exerciseIds = new Set(catalog.map(({ id }) => id));
+  const equipment = [...new Set(catalog.map(({ type }) => type))];
+  const splits = {
+    upperLower: { label: "Oberkörper / Unterkörper", days: [2, 4], sessions: ["Oberkörper", "Unterkörper"] },
+    pushPullLegs: { label: "Push / Pull / Legs", days: [3, 6], sessions: ["Push", "Pull", "Beine"] },
+    fullBody: { label: "Ganzkörper", days: [2, 3], sessions: ["Ganzkörper"] },
+  };
+  const goals = { muscle: "Muskelaufbau", strength: "Kraft", fitness: "Allgemeine Fitness" };
+  const levels = { beginner: "Einsteiger", intermediate: "Fortgeschritten" };
+  const limits = { name: 100, sessions: 20, exercises: 40, sets: 10, reps: 100 };
+
+  function normalizeOptions(options) {
+    if (!options || !Object.hasOwn(splits, options.split) ||
+        !splits[options.split].days.includes(options.days) ||
+        !Object.hasOwn(goals, options.goal) || !Object.hasOwn(levels, options.level)) return null;
+    const available = options.equipment ?? equipment;
+    if (!Array.isArray(available) || !available.length || available.some((type) => !equipment.includes(type))) return null;
+    const { split, days, goal, level } = options;
+    return { split, days, goal, level, equipment: equipment.filter((type) => available.includes(type)) };
+  }
+
+  function normalizePlan(plan) {
+    if (!plan || !Array.isArray(plan.sessions) || plan.sessions.length > limits.sessions) return null;
+    const options = normalizeOptions(plan.options);
+    const name = plan.name ?? (options && splits[options.split].label);
+    const validName = (value) => typeof value === "string" && value.trim().length > 0 && value.trim().length <= limits.name;
+    if (!validName(name)) return null;
+
+    const sessions = [];
+    for (const session of plan.sessions) {
+      if (!session || !validName(session.name) || !Array.isArray(session.exercises)) return null;
+      const exercises = [];
+      for (const entry of session.exercises) {
+        if (!entry || !Number.isInteger(entry.sets) || entry.sets < 1 || entry.sets > limits.sets ||
+            !Number.isInteger(entry.reps) || entry.reps < 1 || entry.reps > limits.reps) return null;
+        const { id, sets, reps } = entry;
+        if (exerciseIds.has(id)) {
+          exercises.push({ id, sets, reps });
+        } else if (validName(entry.name) && (!entry.equipment || equipment.includes(entry.equipment))) {
+          exercises.push({ name: entry.name.trim(), equipment: entry.equipment || "", sets, reps });
+        } else {
+          return null;
+        }
+      }
+      sessions.push({ name: session.name.trim(), exercises });
+    }
+    return { name: name.trim(), options, sessions };
+  }
+
+  return { splits, goals, levels, equipment, limits, normalizeOptions, normalizePlan };
+})();
+
+if (typeof module !== "undefined") module.exports = trainingPlanData;

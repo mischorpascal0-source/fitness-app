@@ -1,2 +1,63 @@
 # fitness-app
 Fitness-App für Cardio, Krafttraining und Ernährungstracking
+
+## Lokal starten
+
+Starte den lokalen Server mit Node.js 24 oder neuer. Eine Paketinstallation ist nicht erforderlich.
+
+```powershell
+node --env-file-if-exists=.env server.cjs
+```
+
+Falls `node` in deiner PowerShell fehlt, kannst du aus dem Repository-Ordner die mit Codex gelieferte Version starten.
+
+```powershell
+& "$env:USERPROFILE\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe" --env-file-if-exists=.env server.cjs
+```
+
+Öffne danach die [lokale App](http://127.0.0.1:3000). Beim ersten Aufruf erscheint die Anmeldung. Eine gültige Sitzung öffnet die App direkt.
+
+Die Tageswerte und der wöchentliche Trainingsplan in `app.js` sind Beispieldaten. Das Dashboard wählt den Trainingseintrag anhand des lokalen Wochentags aus. Tage ohne Eintrag erscheinen als Ruhetage.
+
+Unter **Krafttraining** findest du die Übungsbibliothek mit Suche und Filtern für Muskelgruppe und Gerätetyp. Jede Übungsdetailansicht zeigt eine schematische Beispielposition mit Gerät oder Zubehör. Die Übungsdaten liegen in `exercises.js`, die Bildzuordnungen in `exercise-scenes.js`.
+
+## Trainingsplan
+
+Öffne **Krafttraining → Trainingsplan**. Wähle Split, Einheiten pro Woche, Ziel, Erfahrung und verfügbares Equipment. Der Generator wählt Übungen lokal aus der Bibliothek und variiert die Auswahl bei erneuter Erstellung. Mit **Eigenen Plan erstellen** startest du mit einem leeren Plan und legst deine Einheiten selbst an.
+
+Im Editor kannst du Einheiten und Übungen hinzufügen, verschieben und entfernen. Zum Hinzufügen stehen Namenssuche und Filter für Muskelgruppe und Equipment bereit. Eigene Übungen lassen sich ebenfalls eintragen.
+
+### Persönliche Pläne mit Supabase
+
+Supabase Auth übernimmt die Anmeldung mit E-Mail und Passwort. Trainingspläne liegen in Postgres und gehören über die Auth-Nutzer-ID genau einem Konto. Dieselbe Instanz der App kann auf mehreren Geräten verwendet werden.
+
+1. Erstelle oder öffne dein Supabase-Projekt. Kopiere aus **Connect** die Projekt-URL und den **Publishable key**. Trage beide Werte in die lokale `.env` ein.
+
+   ```dotenv
+   SUPABASE_URL=https://dein-projekt.supabase.co
+   SUPABASE_PUBLISHABLE_KEY=sb_publishable_dein_key
+   ```
+
+2. Wende die Migration in `supabase/migrations/20261104000100_fitness_training_plans.sql` im Projekt an. Mit der Supabase CLI initialisierst du bei Bedarf die Konfiguration mit `supabase init` und nutzt dann `supabase link --project-ref <project-ref>` und `supabase db push --remote`. Für die Einrichtung über das Dashboard kannst du das Skript einmalig im **SQL Editor** ausführen. Falls du danach auf die CLI wechselst, markiere die bereits ausgeführte Migration mit `supabase migration repair --status applied 20261104000100 --remote`. [Supabase-Migrationsworkflow](https://supabase.com/docs/guides/deployment/database-migrations)
+3. Aktiviere im Projekt die E-Mail-Anmeldung mit E-Mail-Bestätigung. Erlaube unter **Authentication → URL Configuration → Redirect URLs** die Adresse `http://127.0.0.1:3000/auth/confirm`. Starte danach den App-Server neu und lege unter **Mein Konto** ein Konto an. Nach dem Bestätigungslink meldest du dich mit E-Mail und Passwort an.
+
+Der Server schickt Datenbankanfragen mit dem jeweiligen Nutzertoken. Row Level Security prüft bei jeder Abfrage, ob der Plan zu diesem Konto gehört. Der App-Server verwaltet die Supabase-Sitzungstokens in HttpOnly-Cookies. Für die App-Konfiguration genügt der [Publishable key](https://supabase.com/docs/guides/getting-started/api-keys).
+
+Wenn Node.js unter Windows die Zertifikatskette der Supabase-Verbindung nicht verifizieren kann, ergänze beim Start `--use-system-ca`.
+
+### Vorhandene lokale Konten und Entwürfe
+
+Ohne die beiden Supabase-Einstellungen verwendet der lokale Server weiterhin Nutzername und Passwort und speichert Konten und Pläne in `.data/fitness.sqlite`. Für den Wechsel exportierst du deine SQLite-Pläne vorab über **Plan exportieren**. Registriere dich anschließend mit deiner E-Mail-Adresse im Supabase-Modus und importiere die Dateien über **Exportierten Plan übernehmen**. Die lokalen Konten und ihre Passwort-Hashes verbleiben in SQLite.
+
+Mit **Lokalen Entwurf übernehmen** kopierst du nach der Anmeldung einen vorhandenen Entwurf in dein Konto. Wenn du einen Entwurf in einer direkt geöffneten `index.html` gespeichert hast, öffne sie erneut und wähle **Lokalen Entwurf exportieren**. Importiere die Datei anschließend im Konto über **Exportierten Plan übernehmen**.
+
+### Gemeinsamer Zugriff von Handy und PC
+
+Das Repository ist für Vercel eingerichtet. Dort liefert Vercel die Browserdateien aus und leitet die Konto- und Plananfragen an eine Node.js-Funktion weiter. Supabase speichert die Konten und Pläne.
+
+1. Verbinde das GitHub-Repository unter **Settings → Git** mit dem Vercel-Projekt. Pushes auf den Produktionsbranch `main` lösen ein Deployment aus. [Vercel-Git-Integration](https://vercel.com/docs/git)
+2. Setze in Vercel für die Produktionsumgebung `SUPABASE_URL` und `SUPABASE_PUBLISHABLE_KEY` aus dem Supabase-Projekt. Lass die Vercel-Systemvariablen verfügbar. Bei einer eigenen Domain kannst du zusätzlich `FITNESS_PUBLIC_ORIGIN` auf deren HTTPS-Adresse setzen. [Vercel-Umgebungsvariablen](https://vercel.com/docs/environment-variables)
+3. Hinterlege nach dem Deployment die öffentliche HTTPS-Adresse als **Site URL** in Supabase und erlaube unter **Redirect URLs** zusätzlich diese Adresse mit dem Pfad `/auth/confirm`. [Supabase-Weiterleitungen](https://supabase.com/docs/guides/auth/redirect-urls)
+4. Richte für die Selbstregistrierung externer Nutzer einen eigenen SMTP-Versand ein. Der Standardversand ist auf E-Mail-Adressen des Supabase-Teams beschränkt. [Supabase-Mailversand](https://supabase.com/docs/guides/auth/auth-smtp)
+
+Der lokale Vercel-Build lässt sich mit `node build-vercel.cjs` prüfen. Für einen eigenen HTTPS-Reverse-Proxy kannst du weiterhin `server.cjs` verwenden und `FITNESS_PUBLIC_ORIGIN` auf die öffentliche HTTPS-Adresse setzen.
