@@ -379,7 +379,7 @@ a.workout:hover, .exercise-card:hover, .detail-close:hover { border-color: var(-
 
 html:has(dialog[open]) { overflow: hidden; }
 
-#exercise-detail, #plan-add-dialog {
+#exercise-detail, #plan-add-dialog, #plan-settings-dialog {
   --dialog-padding: clamp(1rem, 4vw, 1.625rem);
   width: min(calc(100% - 1.5rem), 36rem);
   max-height: calc(100dvh - max(1.5rem, env(safe-area-inset-top)) - max(1.5rem, env(safe-area-inset-bottom)));
@@ -393,7 +393,7 @@ html:has(dialog[open]) { overflow: hidden; }
   border-radius: var(--radius-card);
 }
 
-#exercise-detail::backdrop, #plan-add-dialog::backdrop { background: var(--backdrop); }
+#exercise-detail::backdrop, #plan-add-dialog::backdrop, #plan-settings-dialog::backdrop { background: var(--backdrop); }
 
 .detail-header {
   position: sticky;
@@ -509,6 +509,7 @@ html:has(dialog[open]) { overflow: hidden; }
 .plan-button { font-size: .875rem; font-weight: 650; cursor: pointer; }
 .plan-button:hover { border-color: var(--accent); }
 .plan-button.primary { background: var(--accent); color: var(--background); border-color: var(--accent); }
+a.plan-button { display: inline-flex; align-items: center; text-decoration: none; }
 .plan-button:disabled { opacity: .55; cursor: default; }
 .planner-note { color: var(--muted); font-size: var(--text-small); }
 #plan-status:not(:empty) { margin-block: var(--space-3); color: var(--accent); }
@@ -517,6 +518,7 @@ html:has(dialog[open]) { overflow: hidden; }
   margin-top: var(--space-3);
   padding: clamp(.875rem, 3vw, 1.5rem);
 }
+.plan-session-time { margin-bottom: var(--space-2); }
 
 .plan-editor-heading { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-3); margin-bottom: var(--space-3); }
 .plan-editor-heading > label { flex: 1 1 12rem; }
@@ -566,6 +568,22 @@ html:has(dialog[open]) { overflow: hidden; }
 .plan-equipment-options { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-2); }
 .plan-equipment-options label { display: flex; align-items: center; min-height: 2.75rem; padding-inline: var(--space-2); gap: var(--space-1); border: 1px solid var(--border); border-radius: var(--radius-control); cursor: pointer; }
 .plan-equipment-options input { accent-color: var(--accent); }
+
+#plan-settings-dialog { box-shadow: 0 1rem 3rem rgb(0 0 0 / .38); }
+#plan-settings-title { font-size: var(--text-section); }
+#plan-settings .library-controls { margin-top: 0; }
+.plan-duration {
+  margin-top: var(--space-4);
+  padding: var(--space-3);
+  background: var(--raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+}
+.plan-duration-heading { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-1) var(--space-3); }
+.plan-duration-heading label { font-weight: 650; }
+.plan-duration output { color: var(--accent); font-weight: 750; white-space: nowrap; }
+.plan-duration input { width: 100%; min-height: 2.75rem; margin: 0; accent-color: var(--accent); cursor: pointer; }
+#plan-settings-status:not(:empty) { margin-top: var(--space-2); color: var(--accent); }
 .custom-exercise { margin-bottom: var(--space-3); padding: 0 var(--space-3) var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-control); }
 #plan-add-filters input { padding-inline-start: var(--space-3); }
 #plan-add-results h3 { margin-block: var(--space-3) var(--space-1); }

@@ -1,6 +1,6 @@
 const generateTrainingPlan = (() => {
   const catalog = typeof module === "undefined" ? exerciseCatalog : require("./exercises.js");
-  const { splits, normalizeOptions } = typeof module === "undefined" ? trainingPlanData : require("./plan-data.js");
+  const { splits, sessionTime, normalizeOptions } = typeof module === "undefined" ? trainingPlanData : require("./plan-data.js");
   const byId = new Map(catalog.map((exercise) => [exercise.id, exercise]));
   // A slot describes the movement, independently of the catalog's display group.
   const movements = {
@@ -41,6 +41,9 @@ const generateTrainingPlan = (() => {
       "kz-trizepsdruecken-stange", "mp-bankdruecken-eng", "lh-bankdruecken-eng", "kg-liegestuetz-eng",
     ]],
     hamstring: ["Beinbeuger", false, ["ma-beinbeuger-sitzend", "ma-beinbeuger-liegend", "ma-beinbeuger-stehend-einbeinig"]],
+    chest: ["Fliegende Bewegung", false, ["kh-fliegende-flachbank", "kh-fliegende-schraegbank", "ma-butterfly", "kz-fly-brusthoehe"]],
+    quadriceps: ["Beinstrecken", false, ["ma-beinstrecken"]],
+    abduction: ["Hüftabduktion", false, ["ma-hueftabduktion", "kz-hueftabduktion"]],
     calf: ["Waden", false, ["kh-wadenheben-stehend", "kh-wadenheben-einbeinig", "ma-wadenheben-stehend", "ma-wadenheben-sitzend", "mp-wadenheben-stehend", "kg-wadenheben"]],
     core: ["Rumpf", false, ["kh-crunches", "ma-bauchcrunches", "kz-crunches-kniend", "kg-crunches", "kg-dead-bug"]],
   };
@@ -52,6 +55,14 @@ const generateTrainingPlan = (() => {
     Pull: ["row", "pull|row", "rear", "curl"],
     Beine: ["knee", "hinge", "hamstring|hinge", "calf", "core"],
     Ganzkörper: ["knee", "press", "row|pull", "hinge", "core|calf"],
+  };
+  const additionalPatterns = {
+    Oberkörper: ["rear|lateral", "curl|triceps|press"],
+    Unterkörper: ["quadriceps|knee", "abduction|hinge"],
+    Push: ["chest|press", "triceps|lateral"],
+    Pull: ["pull|row", "curl|rear"],
+    Beine: ["quadriceps|knee", "abduction|hinge"],
+    Ganzkörper: ["overhead|lateral", "pull|hamstring|row"],
   };
   const technical = new Set(["kg-klimmzuege", "kg-pike-pushups", "kh-rumaenisches-kreuzheben-einbeinig", "kh-bulgarian-split-squats"]);
   const compoundAccessories = new Set(["mp-bankdruecken-eng", "lh-bankdruecken-eng", "kg-liegestuetz-eng"]);
@@ -76,6 +87,10 @@ const generateTrainingPlan = (() => {
     if (!options) return null;
     const split = splits[options.split];
     const sameSettings = JSON.stringify(options) === JSON.stringify(normalizeOptions(previous?.options));
+    const { setMinutes, restMinutes } = sessionTime;
+    const setBudget = Math.floor((options.minutes + restMinutes) / (setMinutes + restMinutes));
+    const maxExercises = Math.max(3, Math.floor(setBudget / 2));
+    const additionalSlots = options.minutes >= 75 ? 2 : options.minutes >= 60 ? 1 : 0;
     const usage = new Map();
     const notices = [];
     const sessions = [];
@@ -86,8 +101,11 @@ const generateTrainingPlan = (() => {
       const oldIds = new Set(sameSettings ? previous.sessions[index]?.exercises.map(({ id }) => id) : []);
       const selected = [];
       const missing = [];
-      const slots = patterns[name].map((slot) => slot.split("|").map((key) => movements[key]));
-      for (const slot of slots) {
+      const base = patterns[name];
+      const slots = base.concat(additionalPatterns[name].slice(0, additionalSlots));
+      for (const [slotIndex, keys] of slots.entries()) {
+        if (selected.length >= maxExercises) break;
+        const slot = keys.split("|").map((key) => movements[key]);
         const choices = new Map();
         for (const [label, compound, ids] of slot) {
           for (const id of ids) {
@@ -99,7 +117,7 @@ const generateTrainingPlan = (() => {
           if (choices.size) break;
         }
         if (!choices.size) {
-          missing.push(slot.map(([label]) => label).join(" / "));
+          if (slotIndex < base.length) missing.push(slot.map(([label]) => label).join(" / "));
           continue;
         }
         const available = [...choices.values()];
@@ -114,13 +132,28 @@ const generateTrainingPlan = (() => {
         usage.set(selectedExercise.id, (usage.get(selectedExercise.id) ?? 0) + 1);
       }
       if (missing.length) notices.push(`Einheit ${index + 1} (${name}): ${missing.join(", ")}`);
-      const exercises = selected.sort((a, b) => Number(b.compound) - Number(a.compound))
-        .map(({ id, type, compound }) => ({
+      selected.sort((a, b) => Number(b.compound) - Number(a.compound));
+      const exercises = selected
+        .map(({ id, type, compound }, exerciseIndex) => ({
           id,
-          sets: options.level === "beginner" ? 2 : options.goal === "strength" && compound ? 4 : 3,
+          sets: exerciseIndex < setBudget - selected.length ? 2 : 1,
           reps: options.goal === "strength" ? (compound && type !== "Körpergewicht" ? 5 : 8)
             : options.goal === "muscle" ? (compound ? 8 : 12) : (compound ? 10 : 15),
         }));
+      let remainingSets = setBudget - exercises.reduce((sum, exercise) => sum + exercise.sets, 0);
+      // Spread extra sets across the selected exercises, starting with the compound movements.
+      for (const targetSets of [3, 4]) {
+        for (const [exerciseIndex, exercise] of exercises.entries()) {
+          if (remainingSets === 0) break;
+          const strengthMovement = options.goal === "strength" && selected[exerciseIndex].compound;
+          const maxSets = options.level === "beginner" && options.minutes < 60 ? 2
+            : options.level !== "beginner" && strengthMovement ? 4 : 3;
+          if (targetSets <= maxSets) {
+            exercise.sets = targetSets;
+            remainingSets--;
+          }
+        }
+      }
       sessions.push({ name, exercises });
     }
 

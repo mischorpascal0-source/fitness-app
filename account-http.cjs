@@ -74,10 +74,46 @@ function sendJson(response, status, data) {
   response.end(JSON.stringify(data));
 }
 
+function sendEmailConfirmation(response, query) {
+  // This page reports Supabase's redirect result. Account access still requires sign-in.
+  const confirmed = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(query.get("code") ?? "") &&
+    !["error", "error_code", "error_description"].some((key) => query.has(key));
+  const title = confirmed ? "Deine E-Mail wurde bestätigt." : "E-Mail-Bestätigung fehlgeschlagen";
+  const message = confirmed ? "Du kannst dich jetzt mit deiner E-Mail-Adresse und deinem Passwort anmelden."
+    : "Der Bestätigungslink ist ungültig oder abgelaufen. Wenn du deine E-Mail bereits bestätigt hast, kannst du dich anmelden.";
+  response.writeHead(confirmed ? 200 : 400, {
+    "Content-Type": "text/html; charset=utf-8",
+    "Cache-Control": "no-store",
+    "Referrer-Policy": "no-referrer",
+    "Content-Security-Policy": "default-src 'none'; style-src 'self'; base-uri 'none'; frame-ancestors 'none'",
+  });
+  response.end(`<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#191D2B">
+  <title>${title} · Fitness-App</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="shell login-shell" aria-labelledby="confirmation-title">
+    <header class="page-header">
+      <div class="app-brand">Fitness-App</div>
+      <h1 id="confirmation-title">${title}</h1>
+    </header>
+    <section class="card library-panel">
+      <p>${message}</p>
+      <div class="planner-actions"><a class="plan-button primary" href="/">Zur Anmeldung</a></div>
+    </section>
+  </main>
+</body>
+</html>`);
+}
+
 async function routeAccountRequest(request, response, pathname, origin, handleAccounts) {
   if (pathname === "/auth/confirm" && request.method === "GET") {
-    response.writeHead(303, { Location: "/#trainingsplan", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" });
-    return response.end();
+    return sendEmailConfirmation(response, new URL(request.url, origin).searchParams);
   }
   if (!pathname.startsWith("/api/")) return sendJson(response, 404, { error: "Seite nicht gefunden." });
   if (request.method !== "GET") {

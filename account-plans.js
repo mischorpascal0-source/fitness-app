@@ -35,7 +35,7 @@
   const status = document.querySelector("#account-status");
   const editorStatus = document.querySelector("#plan-status");
   const editor = document.querySelector("#plan-result");
-  const createButtons = document.querySelectorAll('#plan-settings button[type="submit"], #plan-manual-form button[type="submit"]');
+  const createButtons = document.querySelectorAll('#plan-settings-open, #plan-settings button[type="submit"], #plan-manual-form button[type="submit"]');
   let account = null;
   let plans = [];
   let selected = null;
@@ -90,7 +90,7 @@
     renderControls();
   }
 
-  async function perform(task, allowPending = false) {
+  async function perform(task, allowPending = false, errorStatus) {
     if (busy || saving || (pendingPlan && !allowPending)) return false;
     busy = true;
     status.textContent = "";
@@ -100,7 +100,7 @@
       await task();
       return true;
     } catch (error) {
-      (account ? status : loginStatus).textContent = error.message;
+      (errorStatus ?? (account ? status : loginStatus)).textContent = error.message;
       return false;
     } finally {
       busy = false;
@@ -180,11 +180,11 @@
   }
 
   const workspace = {
-    create(plan) {
+    create(plan, errorStatus) {
       return perform(async () => {
         await createRecord(plan);
         editorStatus.textContent = "Im Konto gespeichert.";
-      });
+      }, false, errorStatus);
     },
     save(plan) {
       pendingPlan = plan;

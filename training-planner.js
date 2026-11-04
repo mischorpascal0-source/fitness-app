@@ -1,11 +1,14 @@
 const trainingPlanner = (() => {
-  const { splits, goals, levels, equipment, limits, normalizePlan, normalizeOptions } = trainingPlanData;
+  const { splits, goals, levels, equipment, limits, sessionTime, estimateMinutes, normalizePlan } = trainingPlanData;
   const { groups, find } = catalogSearch;
   const storageKey = "fitness-app.training-plan.v2";
   const legacyKey = "fitness-app.training-plan.v1";
   const catalog = new Map(exerciseCatalog.map((exercise) => [exercise.id, exercise]));
   const settings = document.querySelector("#plan-settings");
-  const { split, days, goal, level } = settings.elements;
+  const settingsDialog = document.querySelector("#plan-settings-dialog");
+  const settingsStatus = document.querySelector("#plan-settings-status");
+  const durationOutput = document.querySelector("#plan-minutes-value");
+  const { split, days, goal, level, minutes } = settings.elements;
   const manualForm = document.querySelector("#plan-manual-form");
   const equipmentOptions = settings.querySelector(".plan-equipment-options");
   const equipmentCount = settings.querySelector("#plan-equipment-count");
@@ -33,6 +36,24 @@ const trainingPlanner = (() => {
 
   function updateDays() {
     days.replaceChildren(...splits[split.value].days.map((day) => new Option(String(day), String(day))));
+  }
+
+  function formatMinutes(value) {
+    const hours = Math.floor(value / 60);
+    const remaining = value % 60;
+    if (!hours) return `${remaining} Min.`;
+    return remaining ? `${hours} Std. ${remaining} Min.` : `${hours} Std.`;
+  }
+
+  function updateDuration() {
+    durationOutput.value = formatMinutes(minutes.valueAsNumber);
+    minutes.setAttribute("aria-valuetext", durationOutput.value);
+  }
+
+  function renderSessionTime(element, session) {
+    const sets = session.exercises.reduce((total, entry) => total + entry.sets, 0);
+    element.hidden = sets === 0;
+    element.textContent = `ca. ${formatMinutes(estimateMinutes(sets))} · ${sets} ${sets === 1 ? "Satz" : "Sätze"}`;
   }
 
   function readLocal() {
@@ -89,7 +110,7 @@ const trainingPlanner = (() => {
     }
   }
 
-  function renderExercise(entry, sessionIndex, index) {
+  function renderExercise(entry, sessionIndex, index, time) {
     const item = exerciseTemplate.content.firstElementChild.cloneNode(true);
     const session = plan.sessions[sessionIndex];
     const exercise = catalog.get(entry.id);
@@ -103,6 +124,7 @@ const trainingPlanner = (() => {
       field.addEventListener("change", () => {
         if (field.validity.valid) {
           entry[field.name] = field.valueAsNumber;
+          if (field.name === "sets") renderSessionTime(time, session);
           save("Änderungen gespeichert.");
         }
         field.value = entry[field.name];
@@ -182,7 +204,9 @@ const trainingPlanner = (() => {
       card.querySelector(".session-label").textContent = `Einheit ${index + 1}`;
       watchName(card.querySelector(".plan-session-name"), session, `Name der Einheit ${index + 1}`);
       const list = card.querySelector("ul");
-      list.append(...session.exercises.map((entry, exerciseIndex) => renderExercise(entry, index, exerciseIndex)));
+      const time = card.querySelector(".plan-session-time");
+      renderSessionTime(time, session);
+      list.append(...session.exercises.map((entry, exerciseIndex) => renderExercise(entry, index, exerciseIndex, time)));
       card.querySelector(".plan-session-empty").hidden = session.exercises.length > 0;
       card.querySelector(".plan-add-button").addEventListener("click", () => openExercisePicker(session));
       bindOrder(card, "plan-session", plan.sessions, index,
@@ -256,14 +280,17 @@ const trainingPlanner = (() => {
     (notices.hidden ? result : notices).scrollIntoView({ block: "start" });
   }
 
-  async function createPlan(nextPlan, messages) {
+  async function createPlan(nextPlan, messages, dialogStatus) {
     if (creating) return;
     if (!workspace && plan && !window.confirm("Den aktuellen lokalen Plan durch einen neuen Plan ersetzen?")) return;
     const currentWorkspace = workspace;
     if (currentWorkspace) {
       creating = true;
       try {
-        if (!await currentWorkspace.create(nextPlan) || workspace !== currentWorkspace) return;
+        if (!await currentWorkspace.create(nextPlan, dialogStatus) || workspace !== currentWorkspace) {
+          if (dialogStatus && !settingsDialog.open) status.textContent = dialogStatus.textContent;
+          return;
+        }
       } finally {
         creating = false;
       }
@@ -272,12 +299,22 @@ const trainingPlanner = (() => {
     renderPlan();
     renderNotices(messages);
     if (!workspace) save("Trainingsplan gespeichert.");
-    focusPlan();
+    if (dialogStatus && settingsDialog.open) settingsDialog.close();
+    if (location.hash === "#trainingsplan") focusPlan();
   }
 
   fillSelect(split, Object.entries(splits).map(([id, entry]) => [id, entry.label]));
   fillSelect(goal, Object.entries(goals));
   fillSelect(level, Object.entries(levels));
+  minutes.min = sessionTime.min;
+  minutes.max = sessionTime.max;
+  minutes.step = sessionTime.step;
+  minutes.addEventListener("input", updateDuration);
+  document.querySelector("#plan-settings-open").addEventListener("click", () => {
+    settingsStatus.textContent = "";
+    settingsDialog.showModal();
+    settingsDialog.scrollTop = 0;
+  });
   fillSelect(addGroup, groups.map((group) => [group, group]));
   fillSelect(addEquipment, equipment.map((type) => [type, type]));
   fillSelect(addForm.elements.customEquipment, equipment.map((type) => [type, type]));
@@ -304,6 +341,8 @@ const trainingPlanner = (() => {
     split.value = options?.split ?? Object.keys(splits)[0];
     goal.value = options?.goal ?? Object.keys(goals)[0];
     level.value = options?.level ?? Object.keys(levels)[0];
+    minutes.value = options?.minutes ?? sessionTime.defaultMinutes;
+    updateDuration();
     updateDays();
     if (options) days.value = String(options.days);
     for (const input of equipmentOptions.querySelectorAll("input")) {
@@ -332,16 +371,20 @@ const trainingPlanner = (() => {
 
   settings.addEventListener("submit", (event) => {
     event.preventDefault();
+    settingsStatus.textContent = "";
     const selected = [...equipmentOptions.querySelectorAll(":checked")].map((input) => input.value);
-    const options = normalizeOptions({ split: split.value, days: Number(days.value), goal: goal.value, level: level.value, equipment: selected });
-    const generated = options && generateTrainingPlan(options, plan);
+    const options = {
+      split: split.value, days: Number(days.value), goal: goal.value, level: level.value,
+      minutes: minutes.valueAsNumber, equipment: selected,
+    };
+    const generated = generateTrainingPlan(options, plan);
     if (!generated) {
-      status.textContent = "Wähle mindestens einen Equipment-Typ aus.";
+      settingsStatus.textContent = "Wähle mindestens einen Equipment-Typ aus.";
       settings.querySelector(".plan-equipment").open = true;
       equipmentOptions.querySelector("input").focus();
       return;
     }
-    createPlan(generated.plan, generated.notices);
+    createPlan(generated.plan, generated.notices, settingsStatus);
   });
 
   manualForm.addEventListener("submit", (event) => {
@@ -366,12 +409,18 @@ const trainingPlanner = (() => {
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
+  function closeDialogs() {
+    if (settingsDialog.open) settingsDialog.close();
+    if (addDialog.open) addDialog.close();
+  }
+
   return {
     getLocalPlan: () => localPlan,
     exportLocalPlan: () => exportPlan(localPlan),
     focusPlan,
+    closeDialogs,
     setWorkspace(nextWorkspace, selectedPlan) {
-      if (addDialog.open) addDialog.close();
+      closeDialogs();
       workspace = nextWorkspace;
       plan = workspace ? normalizePlan(selectedPlan) : localPlan;
       applyOptions(plan?.options);

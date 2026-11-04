@@ -10,6 +10,11 @@ const trainingPlanData = (() => {
   const goals = { muscle: "Muskelaufbau", strength: "Kraft", fitness: "Allgemeine Fitness" };
   const levels = { beginner: "Einsteiger", intermediate: "Fortgeschritten" };
   const limits = { name: 100, sessions: 20, exercises: 40, sets: 10, reps: 100 };
+  const sessionTime = { min: 20, max: 120, step: 5, defaultMinutes: 45, setMinutes: 1, restMinutes: 3 };
+
+  function estimateMinutes(sets) {
+    return sets * sessionTime.setMinutes + Math.max(0, sets - 1) * sessionTime.restMinutes;
+  }
 
   function normalizeOptions(options) {
     if (!options || !Object.hasOwn(splits, options.split) ||
@@ -18,7 +23,10 @@ const trainingPlanData = (() => {
     const available = options.equipment ?? equipment;
     if (!Array.isArray(available) || !available.length || available.some((type) => !equipment.includes(type))) return null;
     const { split, days, goal, level } = options;
-    return { split, days, goal, level, equipment: equipment.filter((type) => available.includes(type)) };
+    const minutes = options.minutes ?? sessionTime.defaultMinutes;
+    if (!Number.isInteger(minutes) || minutes < sessionTime.min || minutes > sessionTime.max ||
+        (minutes - sessionTime.min) % sessionTime.step !== 0) return null;
+    return { split, days, goal, level, minutes, equipment: equipment.filter((type) => available.includes(type)) };
   }
 
   function normalizePlan(plan) {
@@ -49,7 +57,7 @@ const trainingPlanData = (() => {
     return { name: name.trim(), options, sessions };
   }
 
-  return { splits, goals, levels, equipment, limits, normalizeOptions, normalizePlan };
+  return { splits, goals, levels, equipment, limits, sessionTime, estimateMinutes, normalizeOptions, normalizePlan };
 })();
 
 if (typeof module !== "undefined") module.exports = trainingPlanData;

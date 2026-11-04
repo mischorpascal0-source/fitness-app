@@ -19,7 +19,6 @@ const category = document.querySelector("#category");
 const library = document.querySelector("#exercise-library");
 const planner = document.querySelector("#training-planner");
 const exerciseDetail = document.querySelector("#exercise-detail");
-const addExerciseDialog = document.querySelector("#plan-add-dialog");
 const links = [...document.querySelectorAll(".bottom-nav a")];
 
 function renderMetric(id, metric, unit, goalText) {
@@ -65,7 +64,7 @@ function renderRoute(focusHeading = false) {
   const isStrength = active.hash === "#krafttraining";
   const showLibrary = isStrength && !isPlanner;
   if (!showLibrary && exerciseDetail.open) exerciseDetail.close();
-  if (!isPlanner && addExerciseDialog.open) addExerciseDialog.close();
+  if (!isPlanner) trainingPlanner.closeDialogs();
   home.hidden = !isHome;
   date.hidden = !isHome;
   library.hidden = !showLibrary;

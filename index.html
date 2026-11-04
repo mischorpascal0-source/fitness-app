@@ -153,25 +153,11 @@
         </div>
         <p id="account-status" class="planner-note" role="status"></p>
       </section>
-      <form id="plan-settings" class="card library-panel">
+      <section class="card library-panel">
         <h2>Plan erstellen</h2>
-        <div class="planner-settings library-controls">
-          <label>Trainingssplit <select name="split"></select></label>
-          <label>Einheiten pro Woche <select name="days"></select></label>
-          <label>Ziel <select name="goal"></select></label>
-          <label>Erfahrung <select name="level"></select></label>
-        </div>
-        <details class="plan-equipment">
-          <summary>Verfügbares Equipment <span id="plan-equipment-count"></span></summary>
-          <div class="planner-actions">
-            <button class="plan-button" type="button" id="plan-equipment-all">Alle auswählen</button>
-            <button class="plan-button" type="button" id="plan-equipment-clear">Auswahl leeren</button>
-          </div>
-          <div class="plan-equipment-options"></div>
-          <p class="planner-note">Prüfe das Zubehör der ausgewählten Übungen, etwa eine Bank oder Klimmzugstange.</p>
-        </details>
-        <div class="planner-actions"><button class="plan-button primary" type="submit">Trainingsplan erstellen</button></div>
-      </form>
+        <p class="planner-note">Stelle dir einen Plan passend zu deinem Ziel, deiner Zeit und deinem Equipment zusammen.</p>
+        <div class="planner-actions"><button class="plan-button primary" id="plan-settings-open" type="button" aria-haspopup="dialog">Trainingsplan erstellen</button></div>
+      </section>
       <form id="plan-manual-form" class="card library-panel">
         <h2>Eigenen Plan erstellen</h2>
         <div class="library-controls planner-settings">
@@ -218,6 +204,39 @@
     <h3>Ausführung</h3>
     <ol id="detail-steps"></ol>
   </dialog>
+  <dialog id="plan-settings-dialog" aria-labelledby="plan-settings-title">
+    <div class="detail-header">
+      <h2 id="plan-settings-title">Trainingsplan erstellen</h2>
+      <form method="dialog"><button class="plan-button" type="submit">Schließen</button></form>
+    </div>
+    <form id="plan-settings">
+      <div class="planner-settings library-controls">
+        <label>Trainingssplit <select name="split" autofocus></select></label>
+        <label>Einheiten pro Woche <select name="days"></select></label>
+        <label>Ziel <select name="goal"></select></label>
+        <label>Erfahrung <select name="level"></select></label>
+      </div>
+      <div class="plan-duration">
+        <div class="plan-duration-heading">
+          <label for="plan-minutes">Wie viel Zeit hast du pro Training?</label>
+          <output id="plan-minutes-value" for="plan-minutes" aria-live="off"></output>
+        </div>
+        <input id="plan-minutes" name="minutes" type="range" aria-describedby="plan-duration-note">
+        <p class="planner-note" id="plan-duration-note">Wir rechnen mit etwa 1 Minute pro Satz und 3 Minuten Pause zwischen den Sätzen.</p>
+      </div>
+      <details class="plan-equipment">
+        <summary>Verfügbares Equipment <span id="plan-equipment-count"></span></summary>
+        <div class="planner-actions">
+          <button class="plan-button" type="button" id="plan-equipment-all">Alle auswählen</button>
+          <button class="plan-button" type="button" id="plan-equipment-clear">Auswahl leeren</button>
+        </div>
+        <div class="plan-equipment-options"></div>
+        <p class="planner-note">Prüfe das Zubehör der ausgewählten Übungen, etwa eine Bank oder Klimmzugstange.</p>
+      </details>
+      <p id="plan-settings-status" class="planner-note" role="status"></p>
+      <div class="planner-actions"><button class="plan-button primary" type="submit">Plan erstellen</button></div>
+    </form>
+  </dialog>
   <dialog id="plan-add-dialog" aria-labelledby="plan-add-title">
     <div class="detail-header">
       <h2 id="plan-add-title">Übung hinzufügen</h2>
@@ -249,6 +268,7 @@
           <button class="plan-button plan-session-remove" type="button">Einheit löschen</button>
         </div>
       </div>
+      <p class="planner-note plan-session-time" hidden></p>
       <p class="planner-note plan-session-empty">Diese Einheit hat noch keine Übungen.</p>
       <ul class="plan-exercises"></ul>
       <button class="plan-button plan-add-button" type="button">Übung hinzufügen</button>
