@@ -27,6 +27,7 @@
     <symbol id="icon-flame" viewBox="0 0 24 24"><path d="M12 22a7 7 0 0 0 7-7c0-4-3-7-5-9 0 3-2 4-2 4 0-4-3-7-3-7 0 5-4 7-4 12a7 7 0 0 0 7 7Z"/><path d="M12 22a3 3 0 0 0 3-3c0-2-3-4-3-4s-3 2-3 4a3 3 0 0 0 3 3Z"/></symbol>
     <symbol id="icon-arrow" viewBox="0 0 24 24"><path d="M4 12h15m-6-6 6 6-6 6"/></symbol>
     <symbol id="icon-swap" viewBox="0 0 24 24"><path d="M3 8h17m-4-4 4 4-4 4m5 4H4m4-4-4 4 4 4"/></symbol>
+    <symbol id="icon-grip" viewBox="0 0 24 24"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01" stroke-width="3"/></symbol>
     <symbol id="icon-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v5m4-5v5"/></symbol>
     <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5 5"/></symbol>
     <symbol id="icon-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
@@ -289,8 +290,9 @@
         <label>Sätze <input name="sets" type="number" min="1" max="10" step="1" required></label>
         <label>Wdh. <input name="reps" type="number" min="1" max="100" step="1" required></label>
         <div class="plan-order-controls">
-          <button class="plan-button plan-exercise-up" type="button">↑</button>
-          <button class="plan-button plan-exercise-down" type="button">↓</button>
+          <button class="plan-button plan-exercise-grip" type="button" title="Ziehen zum Verschieben" aria-keyshortcuts="ArrowUp ArrowDown">
+            <svg aria-hidden="true"><use href="#icon-grip"/></svg>
+          </button>
           <button class="plan-button plan-remove" type="button" title="Übung entfernen">
             <svg aria-hidden="true"><use href="#icon-trash"/></svg>
           </button>

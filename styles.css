@@ -563,13 +563,23 @@ a.plan-button { display: inline-flex; align-items: center; text-decoration: none
   border: 1px solid var(--border);
   border-radius: var(--space-2);
 }
-.plan-exercise-replace, .plan-remove {
+.plan-exercise-replace, .plan-exercise-grip, .plan-remove {
   display: grid;
   place-items: center;
   width: 2.75rem;
   padding: 0;
 }
 .plan-exercise-replace { grid-area: swap; color: var(--accent); }
+.plan-exercise-grip:enabled { cursor: grab; touch-action: none; user-select: none; }
+.plan-exercise.is-dragging {
+  position: relative;
+  z-index: 1;
+  background: var(--raised);
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--accent);
+  user-select: none;
+}
+.plan-exercise.is-dragging .plan-exercise-grip { cursor: grabbing; }
 .plan-exercise-controls {
   grid-area: controls;
   display: grid;

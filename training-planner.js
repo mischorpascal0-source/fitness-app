@@ -28,6 +28,7 @@ const trainingPlanner = (() => {
   const addStatus = document.querySelector("#plan-add-status");
   const addResults = document.querySelector("#plan-add-results");
   let pickerTarget;
+  let exerciseDrag;
   let workspace;
   let localPlan = readLocal();
   let plan = localPlan;
@@ -99,18 +100,128 @@ const trainingPlanner = (() => {
     });
   }
 
-  function bindOrder(container, prefix, entries, index, focusSelector, label) {
+  function bindSessionOrder(card, index) {
+    const entries = plan.sessions;
     for (const [action, offset, direction] of [["up", -1, "nach oben"], ["down", 1, "nach unten"]]) {
-      const button = container.querySelector(`.${prefix}-${action}`);
+      const button = card.querySelector(`.plan-session-${action}`);
       const target = index + offset;
       button.disabled = target < 0 || target >= entries.length;
-      button.setAttribute("aria-label", `${label} ${direction} verschieben`);
+      button.setAttribute("aria-label", `Einheit ${index + 1} ${direction} verschieben`);
       button.addEventListener("click", () => {
         [entries[index], entries[target]] = [entries[target], entries[index]];
-        renderPlan(focusSelector(target, action));
+        renderPlan(`[data-session-index="${target}"] .plan-session-${action}`);
         save("Reihenfolge gespeichert.");
       });
     }
+  }
+
+  function moveExercise(session, from, to, preventScroll = false) {
+    if (from === to || to < 0 || to >= session.exercises.length) return;
+    const sessionIndex = plan.sessions.indexOf(session);
+    const [entry] = session.exercises.splice(from, 1);
+    session.exercises.splice(to, 0, entry);
+    renderPlan(`[data-session-index="${sessionIndex}"] [data-exercise-index="${to}"] .plan-exercise-grip`, { preventScroll });
+    save("Reihenfolge gespeichert.");
+  }
+
+  function positionExerciseDrag() {
+    const drag = exerciseDrag;
+    const { rows, bounds, list, from } = drag;
+    const origin = bounds[from];
+    const delta = drag.y - drag.startY + drag.listTop - list.getBoundingClientRect().top;
+    const offset = Math.max(bounds[0].top - origin.top, Math.min(delta, bounds.at(-1).bottom - origin.bottom));
+    let target = from;
+    while (offset > 0 && target < rows.length - 1 &&
+      origin.bottom + offset > bounds[target + 1].top + bounds[target + 1].height / 2) target++;
+    while (offset < 0 && target > 0 &&
+      origin.top + offset < bounds[target - 1].bottom - bounds[target - 1].height / 2) target--;
+
+    if (target !== drag.target) {
+      rows.forEach((row, index) => {
+        if (index === from) return;
+        const shift = from < index && index <= target ? -origin.height
+          : target <= index && index < from ? origin.height : 0;
+        row.style.transform = shift ? `translateY(${shift}px)` : "";
+      });
+      drag.target = target;
+    }
+    rows[from].style.transform = `translateY(${offset}px)`;
+  }
+
+  function scrollWhileDragging() {
+    const drag = exerciseDrag;
+    positionExerciseDrag();
+    const edge = 64;
+    const bottom = window.innerHeight - drag.navigationHeight;
+    if (drag.y < edge && drag.target > 0) window.scrollBy(0, -Math.min(16, (edge - drag.y) / 4));
+    if (drag.y > bottom - edge && drag.target < drag.rows.length - 1) {
+      window.scrollBy(0, Math.min(16, (drag.y - bottom + edge) / 4));
+    }
+    drag.frame = requestAnimationFrame(scrollWhileDragging);
+  }
+
+  function finishExerciseDrag(commit = false) {
+    const drag = exerciseDrag;
+    if (!drag) return;
+    exerciseDrag = null;
+    cancelAnimationFrame(drag.frame);
+    drag.rows[drag.from].classList.remove("is-dragging");
+    for (const row of drag.rows) row.style.transform = "";
+    if (drag.handle.hasPointerCapture(drag.pointerId)) drag.handle.releasePointerCapture(drag.pointerId);
+    if (commit) moveExercise(drag.session, drag.from, drag.target, true);
+  }
+
+  function bindExerciseDrag(list, session) {
+    list.addEventListener("pointerdown", (event) => {
+      const handle = event.target.closest(".plan-exercise-grip:enabled");
+      if (!handle || exerciseDrag || !event.isPrimary || event.button !== 0) return;
+      event.preventDefault();
+      handle.focus({ preventScroll: true });
+      const rows = [...list.children];
+      const from = Number(handle.closest(".plan-exercise").dataset.exerciseIndex);
+      handle.setPointerCapture(event.pointerId);
+      exerciseDrag = {
+        handle, list, session, rows, from, target: from, pointerId: event.pointerId,
+        bounds: rows.map((row) => row.getBoundingClientRect()),
+        listTop: list.getBoundingClientRect().top,
+        navigationHeight: document.querySelector(".bottom-nav").offsetHeight,
+        startY: event.clientY, y: event.clientY, frame: 0,
+      };
+    });
+    list.addEventListener("pointermove", (event) => {
+      const drag = exerciseDrag;
+      if (drag?.pointerId !== event.pointerId) return;
+      drag.y = event.clientY;
+      if (!drag.frame && Math.abs(drag.y - drag.startY) >= 4) {
+        drag.rows[drag.from].classList.add("is-dragging");
+        scrollWhileDragging();
+      }
+    });
+    list.addEventListener("pointerup", (event) => {
+      if (exerciseDrag?.pointerId !== event.pointerId) return;
+      if (exerciseDrag.frame) {
+        exerciseDrag.y = event.clientY;
+        positionExerciseDrag();
+      }
+      finishExerciseDrag(true);
+    });
+    for (const eventName of ["pointercancel", "lostpointercapture"]) {
+      list.addEventListener(eventName, (event) => {
+        if (exerciseDrag?.pointerId === event.pointerId) finishExerciseDrag();
+      });
+    }
+    list.addEventListener("keydown", (event) => {
+      const handle = event.target.closest(".plan-exercise-grip:enabled");
+      if (!handle) return;
+      if (exerciseDrag) {
+        if (event.key === "Escape") finishExerciseDrag();
+        return;
+      }
+      if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+      event.preventDefault();
+      const from = Number(handle.closest(".plan-exercise").dataset.exerciseIndex);
+      moveExercise(session, from, from + (event.key === "ArrowUp" ? -1 : 1));
+    });
   }
 
   function createPreview(exercise) {
@@ -148,8 +259,9 @@ const trainingPlanner = (() => {
     }
 
     const row = `[data-session-index="${sessionIndex}"]`;
-    bindOrder(item, "plan-exercise", session.exercises, index,
-      (target, action) => `${row} [data-exercise-index="${target}"] .plan-exercise-${action}`, name);
+    const grip = item.querySelector(".plan-exercise-grip");
+    grip.disabled = session.exercises.length < 2;
+    grip.setAttribute("aria-label", `${name} verschieben`);
     const replace = item.querySelector(".plan-exercise-replace");
     replace.setAttribute("aria-label", `${name} austauschen`);
     replace.addEventListener("click", () => openExercisePicker(session, entry));
@@ -184,7 +296,8 @@ const trainingPlanner = (() => {
     addDialog.scrollTop = 0;
   }
 
-  function renderPlan(focusSelector) {
+  function renderPlan(focusSelector, focusOptions) {
+    finishExerciseDrag();
     result.replaceChildren();
     if (!plan) return;
     const header = document.createElement("div");
@@ -231,10 +344,10 @@ const trainingPlanner = (() => {
       const time = card.querySelector(".plan-session-time");
       renderSessionTime(time, session);
       list.append(...session.exercises.map((entry, exerciseIndex) => renderExercise(entry, index, exerciseIndex, time)));
+      bindExerciseDrag(list, session);
       card.querySelector(".plan-session-empty").hidden = session.exercises.length > 0;
       card.querySelector(".plan-add-button").addEventListener("click", () => openExercisePicker(session));
-      bindOrder(card, "plan-session", plan.sessions, index,
-        (target, action) => `[data-session-index="${target}"] .plan-session-${action}`, `Einheit ${index + 1}`);
+      bindSessionOrder(card, index);
       card.querySelector(".plan-session-remove").addEventListener("click", () => {
         if (session.exercises.length && !window.confirm(`„${session.name}“ mit allen Übungen entfernen?`)) return;
         plan.sessions.splice(index, 1);
@@ -246,7 +359,7 @@ const trainingPlanner = (() => {
     if (focusSelector) {
       const control = result.querySelector(focusSelector);
       const fallback = control?.closest(".plan-exercise, .plan-editor-heading")?.querySelector("input");
-      (control?.disabled ? fallback : control)?.focus();
+      (control?.disabled ? fallback : control)?.focus(focusOptions);
     }
   }
 
@@ -453,6 +566,7 @@ const trainingPlanner = (() => {
   }
 
   function closeDialogs() {
+    finishExerciseDrag();
     if (settingsDialog.open) settingsDialog.close();
     if (addDialog.open) addDialog.close();
   }
