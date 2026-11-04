@@ -4,7 +4,7 @@ const { dirname, join } = require("node:path");
 const { DatabaseSync } = require("node:sqlite");
 const { promisify } = require("node:util");
 const { normalizePlan } = require("./plan-data.js");
-const { readJson, planIdFromPath } = require("./account-http.cjs");
+const { readJson, planIdFromPath, readEmail, readRegistration } = require("./account-http.cjs");
 
 const deriveKey = promisify(scrypt);
 const passwordOptions = { N: 32768, r: 8, p: 3, maxmem: 64 * 1024 * 1024 };
@@ -24,6 +24,12 @@ db.exec(`
     salt BLOB NOT NULL,
     password_hash BLOB NOT NULL
   ) STRICT;
+  CREATE TABLE IF NOT EXISTS account_profiles (
+    account_id TEXT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
+    first_name TEXT NOT NULL,
+    last_name TEXT NOT NULL,
+    birth_date TEXT NOT NULL
+  ) STRICT;
   CREATE TABLE IF NOT EXISTS sessions (
     token_hash TEXT PRIMARY KEY,
     account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
@@ -42,7 +48,8 @@ db.exec(`
 
 const statements = {
   getAccount: db.prepare("SELECT * FROM accounts WHERE username = ?"),
-  addAccount: db.prepare("INSERT INTO accounts (id, username, salt, password_hash) VALUES (?, ?, ?, ?)"),
+  addAccount: db.prepare("INSERT INTO accounts (id, username, salt, password_hash) VALUES (?, ?, ?, ?) ON CONFLICT(username) DO NOTHING"),
+  addProfile: db.prepare("INSERT INTO account_profiles (account_id, first_name, last_name, birth_date) VALUES (?, ?, ?, ?)"),
   getSession: db.prepare(`
     SELECT accounts.id, accounts.username FROM sessions JOIN accounts ON accounts.id = sessions.account_id
     WHERE sessions.token_hash = ? AND sessions.expires_at > ?
@@ -92,11 +99,13 @@ function login(request, response, account) {
 
 async function authenticate(request, response, sendJson, register) {
   const body = await readJson(request);
-  const username = typeof body?.username === "string" ? body.username.trim() : "";
+  const registration = register ? readRegistration(body) : null;
+  if (registration?.error) return sendJson(response, 400, { error: registration.error });
+  const username = registration?.email ?? (typeof body?.username === "string" ? body.username.trim() : "");
   const password = body?.password;
-  if (!/^[a-z0-9_.-]{3,32}$/i.test(username) ||
+  if ((!readEmail(username) && !/^[a-z0-9_.-]{3,32}$/i.test(username)) ||
       typeof password !== "string" || password.length < 12 || password.length > 128) {
-    return sendJson(response, 400, { error: "Verwende 3–32 Zeichen für den Nutzernamen und 12–128 Zeichen für das Passwort." });
+    return sendJson(response, 400, { error: "Gib deine E-Mail-Adresse oder deinen Nutzernamen und dein Passwort ein." });
   }
 
   const now = Date.now();
@@ -110,21 +119,29 @@ async function authenticate(request, response, sendJson, register) {
   authAttempts++;
   authInFlight++;
   try {
-    const account = statements.getAccount.get(username);
     if (register) {
       const salt = randomBytes(16);
       const hash = await deriveKey(password, salt, 64, passwordOptions);
-      if (account || statements.getAccount.get(username)) {
-        return sendJson(response, 409, { error: "Dieser Nutzername ist bereits vergeben." });
-      }
       const id = randomUUID();
-      statements.addAccount.run(id, username, salt, hash);
+      const profile = registration.profile;
+      let created;
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        created = statements.addAccount.run(id, username, salt, hash).changes;
+        if (created) statements.addProfile.run(id, profile.first_name, profile.last_name, profile.birth_date);
+        db.exec("COMMIT");
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
+      if (!created) return sendJson(response, 409, { error: "Diese E-Mail-Adresse ist bereits vergeben." });
       return sendJson(response, 201, { user: login(request, response, { id, username }) });
     }
 
+    const account = statements.getAccount.get(username);
     const hash = await deriveKey(password, account?.salt ?? dummySalt, 64, passwordOptions);
     if (!timingSafeEqual(hash, account?.password_hash ?? dummyHash) || !account) {
-      return sendJson(response, 401, { error: "Nutzername oder Passwort ist falsch." });
+      return sendJson(response, 401, { error: "Die Anmeldedaten sind falsch." });
     }
     return sendJson(response, 200, { user: login(request, response, account) });
   } finally {

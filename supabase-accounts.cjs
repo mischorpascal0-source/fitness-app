@@ -1,5 +1,5 @@
 const { createHash, randomBytes } = require("node:crypto");
-const { readJson, planIdFromPath } = require("./account-http.cjs");
+const { readJson, planIdFromPath, readEmail, readRegistration } = require("./account-http.cjs");
 const { normalizePlan } = require("./plan-data.js");
 
 const cookieNames = { access: "fitness_cloud_access", refresh: "fitness_cloud_refresh" };
@@ -108,16 +108,18 @@ function createSupabaseAccounts(baseUrl, publishableKey) {
 
   async function authenticate(request, response, sendJson, origin, register) {
     const body = await readJson(request);
-    const email = typeof body?.username === "string" ? body.username.trim() : "";
+    const registration = register ? readRegistration(body) : null;
+    if (registration?.error) return sendJson(response, 400, { error: registration.error });
+    const email = registration?.email ?? readEmail(body?.username);
     const password = body?.password;
-    if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
-        typeof password !== "string" || password.length < (register ? 12 : 1) || password.length > 128) {
-      return sendJson(response, 400, { error: "Gib eine gültige E-Mail-Adresse und ein Passwort ein. Neue Passwörter brauchen mindestens 12 Zeichen." });
+    if (!email || typeof password !== "string" || !password.length || password.length > 128) {
+      return sendJson(response, 400, { error: "Gib eine gültige E-Mail-Adresse und ein Passwort ein." });
     }
     const data = { email, password };
     let endpoint = "/auth/v1/token?grant_type=password";
     if (register) {
       endpoint = "/auth/v1/signup?" + new URLSearchParams({ redirect_to: origin + "/auth/confirm" });
+      data.data = registration.profile;
       // The email verifies the account. The user signs in afterwards, so no verifier or session goes in the email redirect.
       data.code_challenge = createHash("sha256").update(randomBytes(32).toString("base64url")).digest("base64url");
       data.code_challenge_method = "s256";

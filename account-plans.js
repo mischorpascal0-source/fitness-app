@@ -19,6 +19,9 @@
   const authMode = document.querySelector("#account-mode");
   const identityLabel = document.querySelector("#account-identity-label");
   const authHint = document.querySelector("#account-auth-hint");
+  const personFields = document.querySelector("#account-person");
+  const confirmationField = document.querySelector("#account-confirmation");
+  const { username, password, passwordConfirmation, firstName, lastName, birthDate } = auth.elements;
   const member = document.querySelector("#account-member");
   const userLabel = document.querySelector("#account-user");
   const logout = document.querySelector("#account-logout");
@@ -194,35 +197,57 @@
     if (!account) document.title = `${loginTitle.textContent} · Fitness-App`;
     authSubmit.textContent = register ? "Registrieren" : "Anmelden";
     authMode.textContent = register ? "Zur Anmeldung" : "Konto erstellen";
-    auth.elements.password.autocomplete = register ? "new-password" : "current-password";
-    auth.elements.password.minLength = emailAuth && !register ? 1 : 12;
+    identityLabel.textContent = register || emailAuth ? "E-Mail-Adresse" : "Nutzername oder E-Mail-Adresse";
+    username.type = register || emailAuth ? "email" : "text";
+    username.removeAttribute("minlength");
+    username.removeAttribute("pattern");
+    username.maxLength = 254;
+    password.autocomplete = register ? "new-password" : "current-password";
+    password.minLength = emailAuth && !register ? 1 : 12;
+    personFields.hidden = personFields.disabled = !register;
+    confirmationField.hidden = passwordConfirmation.disabled = !register;
+    authHint.textContent = emailAuth
+      ? "Neue Passwörter brauchen mindestens 12 Zeichen. Bestätige nach der Registrierung deine E-Mail-Adresse."
+      : "Neue Passwörter brauchen mindestens 12 Zeichen.";
     authHint.hidden = !register;
+    validatePasswordConfirmation();
   }
 
   function configureAuthMode(mode) {
-    if (mode !== "email") return;
-    emailAuth = true;
-    const input = auth.elements.username;
-    identityLabel.textContent = "E-Mail-Adresse";
-    input.type = "email";
-    input.removeAttribute("minlength");
-    input.removeAttribute("pattern");
-    input.maxLength = 254;
-    authHint.textContent = "Neue Passwörter brauchen mindestens 12 Zeichen. Bestätige nach der Registrierung deine E-Mail-Adresse.";
+    emailAuth = mode === "email";
     renderAuthMode();
   }
 
+  function validatePasswordConfirmation() {
+    const mismatch = register && passwordConfirmation.value && password.value !== passwordConfirmation.value;
+    passwordConfirmation.setCustomValidity(mismatch ? "Die Passwörter stimmen nicht überein." : "");
+  }
+
+  const today = new Date();
+  birthDate.max = [today.getFullYear(), today.getMonth() + 1, today.getDate()]
+    .map((part) => String(part).padStart(2, "0")).join("-");
+  password.addEventListener("input", validatePasswordConfirmation);
+  passwordConfirmation.addEventListener("input", validatePasswordConfirmation);
   authMode.addEventListener("click", () => {
     register = !register;
+    password.value = passwordConfirmation.value = "";
     renderAuthMode();
   });
   auth.addEventListener("submit", (event) => {
     event.preventDefault();
-    perform(async () => {
-      const { user, confirmationRequired } = await api(register ? "/api/register" : "/api/login", "POST", {
-        username: auth.elements.username.value,
-        password: auth.elements.password.value,
+    validatePasswordConfirmation();
+    if (!auth.reportValidity()) return;
+    const fields = { username: username.value, password: password.value };
+    if (register) {
+      Object.assign(fields, {
+        firstName: firstName.value,
+        lastName: lastName.value,
+        birthDate: birthDate.value,
+        passwordConfirmation: passwordConfirmation.value,
       });
+    }
+    perform(async () => {
+      const { user, confirmationRequired } = await api(register ? "/api/register" : "/api/login", "POST", fields);
       auth.reset();
       register = false;
       renderAuthMode();

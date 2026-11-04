@@ -39,13 +39,20 @@
       <form id="account-auth" hidden>
         <div class="library-controls">
           <label><span id="account-identity-label">Nutzername</span> <input name="username" autocomplete="username" minlength="3" maxlength="32" pattern="[a-zA-Z0-9_.\-]+" required></label>
+          <fieldset id="account-person" class="account-person" hidden disabled>
+            <legend>Persönliche Angaben</legend>
+            <label>Vorname <input name="firstName" autocomplete="given-name" maxlength="80" required></label>
+            <label>Nachname <input name="lastName" autocomplete="family-name" maxlength="80" required></label>
+            <label>Geburtsdatum <input name="birthDate" type="date" autocomplete="bday" required></label>
+          </fieldset>
           <label>Passwort <input name="password" type="password" autocomplete="current-password" minlength="12" maxlength="128" required></label>
+          <label id="account-confirmation" hidden>Passwort bestätigen <input name="passwordConfirmation" type="password" autocomplete="new-password" maxlength="128" required disabled></label>
         </div>
         <div class="planner-actions">
           <button class="plan-button primary" type="submit">Anmelden</button>
           <button id="account-mode" class="plan-button" type="button">Konto erstellen</button>
         </div>
-        <p id="account-auth-hint" class="planner-note" hidden>Nutze 3–32 Zeichen aus Buchstaben, Zahlen, Punkt, Bindestrich oder Unterstrich und ein Passwort mit mindestens 12 Zeichen.</p>
+        <p id="account-auth-hint" class="planner-note" hidden>Neue Passwörter brauchen mindestens 12 Zeichen.</p>
       </form>
       <p id="login-status" role="status"></p>
       <button id="login-retry" class="plan-button" type="button" hidden>Erneut versuchen</button>

@@ -594,6 +594,10 @@ html:has(dialog[open]) { overflow: hidden; }
 .login-shell { max-width: 30rem; }
 .login-shell:not([hidden]) { display: grid; align-content: center; min-height: 100svh; }
 .login-shell .library-controls { grid-template-columns: minmax(0, 1fr); margin-top: 0; }
+.login-shell #account-confirmation[hidden] { display: none; }
+.account-person { min-width: 0; margin: 0; padding: var(--space-2) var(--space-3) var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-control); }
+.account-person:not([hidden]) { display: grid; gap: var(--space-2); }
+.account-person legend { padding-inline: var(--space-1); color: var(--muted); font-size: var(--text-small); }
 #login-status:empty { display: none; }
 #login-status { color: var(--muted); }
 #account-auth:not([hidden]) + #login-status:not(:empty), #login-retry, #login-export-draft { margin-top: var(--space-2); }
