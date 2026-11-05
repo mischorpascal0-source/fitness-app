@@ -30,16 +30,31 @@ const strengthDashboard = (() => {
   const activityDialog = document.querySelector("#activity-dialog");
   const catalog = new Map(exerciseCatalog.map((exercise) => [exercise.id, exercise]));
   const shortDate = new Intl.DateTimeFormat("de-DE", { day: "numeric", month: "short" });
+  const fullDate = new Intl.DateTimeFormat("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
   let storageKey;
   let journal;
   let shownPlan;
   let shownDate;
   let selectedDate = new Date();
+  let lastToday = dateKey(selectedDate);
 
   function dateKey(date) {
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
     return `${date.getFullYear()}-${month}-${day}`;
+  }
+
+  function selectedSession() {
+    const session = trainingPlanner.getPlan()?.sessions[sessionSelect.value];
+    return session?.weekday === (selectedDate.getDay() + 6) % 7 ? session : null;
+  }
+
+  function selectedActiveWorkout() {
+    const active = journal?.active;
+    const session = selectedSession();
+    if (!active || !session || active.date !== dateKey(selectedDate)) return null;
+    if (active.sourcePlanId && active.sourcePlanId !== document.querySelector("#account-plans").value) return null;
+    return (active.sourceSession ? active.sourceSession === JSON.stringify(session) : active.name === session.name) ? active : null;
   }
 
   function primaryMuscles(exercise) {
@@ -133,7 +148,7 @@ const strengthDashboard = (() => {
       button.classList.toggle("is-planned", Boolean(planned));
       button.classList.toggle("is-completed", completed.has(key));
       button.setAttribute("aria-pressed", String(key === dateKey(selectedDate)));
-      button.setAttribute("aria-label", label + ", " + shortDate.format(date) + (planned ? ", Training geplant" : ""));
+      button.setAttribute("aria-label", fullDate.format(date) + (planned ? ", Training geplant" : "") + (completed.has(key) ? ", Training abgeschlossen" : ""));
       const name = document.createElement("small");
       name.textContent = label.slice(0, 2);
       const number = document.createElement("strong");
@@ -177,15 +192,19 @@ const strengthDashboard = (() => {
   }
 
   function renderSelectedSession() {
-    const session = trainingPlanner.getPlan()?.sessions[sessionSelect.value];
-    const exercises = journal.active?.exercises ?? (session ? exercisesForToday(session) : []);
-    const name = journal.active?.name ?? session?.name ?? "Dein Trainingsplan";
+    const session = selectedSession();
+    const active = selectedActiveWorkout();
+    const exercises = active?.exercises ?? (session ? exercisesForToday(session) : []);
+    const name = active?.name ?? session?.name ?? "Dein Trainingsplan";
     document.querySelector("#strength-today").textContent = name;
-    start.setAttribute("aria-label", name + (journal.active ? " fortsetzen" : " starten"));
+    start.setAttribute("aria-label", name + (active ? " fortsetzen" : " starten") + ", " + fullDate.format(selectedDate));
+    const actionLabel = active ? "Training fortsetzen" : "Training starten";
+    start.querySelector(".sr-only").textContent = actionLabel;
+    document.querySelector("#strength-start-hint").firstChild.textContent = actionLabel + " ";
     const sets = exercises.reduce((sum, entry) => sum + (entry.sets ?? entry.done.length), 0);
     facts.replaceChildren(...[
       ["#icon-clock", trainingPlanData.estimateMinutes(sets) + " Minuten"],
-      ["#icon-strength", exercises.length + " Übungen"],
+      ["#icon-strength", exercises.length + (exercises.length === 1 ? " Übung" : " Übungen")],
     ].map(([icon, text]) => {
       const chip = document.createElement("span");
       chip.innerHTML = '<svg aria-hidden="true"><use href="' + icon + '"/></svg>';
@@ -220,7 +239,10 @@ const strengthDashboard = (() => {
       return row;
     }));
     customize.hidden = Boolean(journal.active) || !session;
-    start.disabled = !journal.active && !exercises.length;
+    start.disabled = Boolean(journal.active && !active) || !exercises.length;
+    const blocked = document.querySelector("#strength-active-note");
+    blocked.hidden = !journal.active || Boolean(active);
+    if (!blocked.hidden) blocked.textContent = "Es läuft noch ein anderes Training. Setze es über „Training läuft“ fort oder verwirf es, bevor du diese Einheit startest.";
   }
 
   function renderHistory() {
@@ -243,6 +265,9 @@ const strengthDashboard = (() => {
   }
 
   function render() {
+    const todayKey = dateKey(new Date());
+    if (lastToday !== todayKey && dateKey(selectedDate) === lastToday) selectedDate = new Date();
+    lastToday = todayKey;
     activeWidget.hidden = !storageKey || !journal?.active;
     document.body.classList.toggle("has-active-workout", Boolean(storageKey && journal?.active));
     document.querySelector("#active-workout-name").textContent = journal?.active?.name ?? "";
@@ -252,7 +277,7 @@ const strengthDashboard = (() => {
     const weekday = (now.getDay() + 6) % 7;
     const plan = trainingPlanner.getPlan();
     const sessions = plan?.sessions ?? [];
-    const available = sessions.map((session, index) => ({ session, index })).filter(({ session }) => session.exercises.length);
+    const available = sessions.map((session, index) => ({ session, index })).filter(({ session }) => session.weekday === weekday && session.exercises.length);
     const scheduled = sessions.filter((session) => session.weekday === weekday);
     const dayLabel = today === dateKey(new Date()) ? "Heute" : shortDate.format(now);
     if (scheduled.length) schedule.textContent = `${dayLabel} geplant · ${scheduled.map(({ name }) => name).join(" · ")}`;
@@ -260,18 +285,37 @@ const strengthDashboard = (() => {
     else schedule.textContent = "Erstelle einen Trainingsplan, um eine Einheit zu starten.";
     schedule.classList.toggle("sr-only", scheduled.length > 0);
 
-    const preferred = available.find(({ session }) => session.weekday === weekday) ?? available[0];
     const selection = shownPlan === plan && shownDate === today ? sessionSelect.value : "";
     sessionSelect.replaceChildren(...available.map(({ session, index }) => new Option(session.name, String(index))));
     if (available.some(({ index }) => String(index) === selection)) sessionSelect.value = selection;
-    else if (preferred) sessionSelect.value = String(preferred.index);
+    else if (available.length) sessionSelect.value = String(available[0].index);
     if (shownPlan !== plan || shownDate !== today) resetAdjustments();
     shownPlan = plan;
     shownDate = today;
-    sessionField.hidden = Boolean(journal.active) || !available.length;
-    start.hidden = !storageKey || (!journal.active && !available.length);
-    start.querySelector(".sr-only").textContent = journal.active ? "Training fortsetzen" : "Training starten";
-    document.querySelector("#strength-create").hidden = Boolean(plan?.sessions.length);
+    sessionField.hidden = Boolean(selectedActiveWorkout()) || available.length < 2;
+    start.hidden = !storageKey || !available.length;
+    document.querySelector("#strength-session-card").hidden = !available.length;
+    document.querySelector("#strength-empty-day").hidden = available.length > 0;
+    const emptyTitle = document.querySelector("#strength-empty-title");
+    const emptyMessage = document.querySelector("#strength-empty-message");
+    const emptyLink = document.querySelector("#strength-empty-plan");
+    if (!sessions.length) {
+      emptyTitle.textContent = "Dein erster Trainingsplan";
+      emptyMessage.textContent = "Erstelle deinen Plan und wähle die Wochentage, an denen du trainieren möchtest.";
+      emptyLink.textContent = "Trainingsplan erstellen";
+    } else if (scheduled.length) {
+      emptyTitle.textContent = scheduled.map(({ name }) => name).join(" · ");
+      emptyMessage.textContent = "Füge dieser Einheit im Trainingsplan Übungen hinzu, um sie zu starten.";
+      emptyLink.textContent = "Einheit vervollständigen";
+    } else if (!sessions.some((session) => Number.isInteger(session.weekday))) {
+      emptyTitle.textContent = "Trainingstage festlegen";
+      emptyMessage.textContent = "Ordne deinen Einheiten im Trainingsplan feste Wochentage zu. Sie erscheinen dann jede Woche im Kalender.";
+      emptyLink.textContent = "Trainingstage festlegen";
+    } else {
+      emptyTitle.textContent = "Ruhetag";
+      emptyMessage.textContent = "Für diesen Tag ist kein Krafttraining eingeplant. Wähle oben einen Trainingstag, um eine Einheit zu starten oder nachzuholen.";
+      emptyLink.textContent = "Trainingstage ändern";
+    }
     renderCalendar(plan);
     renderSelectedSession();
     renderWeek(now, weekday);
@@ -288,6 +332,7 @@ const strengthDashboard = (() => {
   function renderWorkout() {
     const active = journal.active;
     workoutTitle.textContent = active.name;
+    document.querySelector("#workout-scheduled-date").textContent = "Training für " + fullDate.format(new Date(active.date + "T12:00:00"));
     workoutExercises.replaceChildren(...active.exercises.map((exercise, index) => {
       const fieldset = document.createElement("fieldset");
       fieldset.className = "workout-sets";
@@ -365,11 +410,13 @@ const strengthDashboard = (() => {
     updateWorkoutProgress();
   }
 
-  function openWorkout() {
+  function openWorkout(resume = false) {
     if (!storageKey) return;
+    if (resume && !journal.active) return;
+    if (journal.active && !resume && !selectedActiveWorkout()) return;
     status.textContent = "";
     if (!journal.active) {
-      const session = trainingPlanner.getPlan()?.sessions[sessionSelect.value];
+      const session = selectedSession();
       if (!session?.exercises.length) return;
       const entries = exercisesForToday(session);
       if (!entries.length) {
@@ -377,8 +424,10 @@ const strengthDashboard = (() => {
         return;
       }
       const active = {
-        date: dateKey(new Date()),
+        date: dateKey(selectedDate),
         startedAt: Date.now(),
+        sourcePlanId: document.querySelector("#account-plans").value,
+        sourceSession: JSON.stringify(session),
         name: session.name,
         exercises: entries.map((entry) => {
           const exercise = catalog.get(entry.id);
@@ -403,12 +452,12 @@ const strengthDashboard = (() => {
     render();
     renderTimers();
   }
-  start.addEventListener("click", openWorkout);
-  activeWidget.addEventListener("click", openWorkout);
+  start.addEventListener("click", () => openWorkout());
+  activeWidget.addEventListener("click", () => openWorkout(true));
 
   finish.addEventListener("click", () => {
     if (!journal.active) return;
-    const { date, name, exercises } = journal.active;
+    const { date, name, exercises, startedAt } = journal.active;
     const groups = new Map();
     let totalSets = 0;
     let volume = 0;
@@ -423,7 +472,7 @@ const strengthDashboard = (() => {
     }
     if (!totalSets) return;
     const workouts = [...journal.workouts, {
-      date, name, totalSets, muscleSets: [...groups], volume, exercises,
+      date, name, totalSets, muscleSets: [...groups], volume, exercises, startedAt,
       minutes: Math.max(1, Math.round((Date.now() - journal.active.startedAt) / 60_000)),
     }];
     if (!writeJournal({ workouts, active: null }, workoutStatus)) return;
@@ -445,9 +494,14 @@ const strengthDashboard = (() => {
   document.querySelector("#strength-add-activity").addEventListener("click", () => activityDialog.showModal());
   document.querySelector("#activity-strength").addEventListener("click", () => {
     activityDialog.close();
-    if (trainingPlanner.getPlan()?.sessions.some(({ exercises }) => exercises.length)) optionsDialog.showModal();
-    else location.hash = "#trainingsplan";
+    if (selectedSession()?.exercises.length) optionsDialog.showModal();
+    else if (!trainingPlanner.getPlan()?.sessions.length) location.hash = "#trainingsplan";
+    else {
+      status.textContent = "Wähle im Kalender einen Trainingstag aus, um die geplante Einheit zu starten.";
+      calendar.querySelector('[aria-pressed="true"]').focus();
+    }
   });
+  document.querySelector("#calendar-today").addEventListener("click", () => { selectedDate = new Date(); render(); });
   for (const [selector, offset] of [["#calendar-prev", -7], ["#calendar-next", 7]]) {
     document.querySelector(selector).addEventListener("click", () => {
       selectedDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate() + offset);
@@ -505,6 +559,7 @@ const strengthDashboard = (() => {
       storageKey = id ? `fitness-app.workout-journal.v1.${id}` : null;
       journal = readJournal();
       selectedDate = new Date();
+      lastToday = dateKey(selectedDate);
       shownPlan = undefined;
       status.textContent = "";
       render();

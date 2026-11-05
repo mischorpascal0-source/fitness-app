@@ -243,7 +243,7 @@ a.workout:hover, .exercise-card:hover, .detail-close:hover { border-color: var(-
 
 .nav-inner {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: var(--space-1);
   max-width: 42rem;
   margin-inline: auto;
@@ -840,7 +840,7 @@ a.plan-button { display: inline-flex; align-items: center; text-decoration: none
 .header-actions .icon-button { background: transparent; border: 0; width: 2.5rem; }
 .training-state { padding: .35rem .5rem; border: 1px solid var(--border); border-radius: var(--space-2); color: #9EA99B; font-size: .6875rem; font-weight: 500; }
 .bottom-nav { inset: auto var(--space-4) max(var(--space-3), env(safe-area-inset-bottom)); max-width: 42rem; margin-inline: auto; padding: var(--space-1); border: 1px solid #343A32; border-radius: 1.125rem; background: rgb(37 41 37 / .96); }
-.bottom-nav a { min-height: 3.5rem; gap: .25rem; font-size: clamp(.5rem, 2.25vw, .625rem); font-weight: 550; text-transform: uppercase; white-space: nowrap; }
+.bottom-nav a { min-height: 3.5rem; min-width: 0; gap: .25rem; font-size: clamp(.5625rem, 2.5vw, .6875rem); font-weight: 550; white-space: nowrap; }
 .bottom-nav a[aria-current="page"] { background: transparent; color: var(--accent); }
 .bottom-nav a[href="#home"][aria-current="page"], .bottom-nav a[href="#statistiken"][aria-current="page"] { color: var(--text); }
 .bottom-nav a[href="#ernaehrung"][aria-current="page"] { color: #99BD49; }
@@ -887,8 +887,10 @@ a.plan-button { display: inline-flex; align-items: center; text-decoration: none
 #strength-dashboard { gap: var(--space-3); }
 .calendar-panel { margin-inline: calc(-1 * var(--page-gutter)); padding: var(--space-3) var(--page-gutter); border: 0; border-bottom: 1px solid var(--border); border-radius: 0 0 1.25rem 1.25rem; }
 .calendar-panel .section-heading { color: var(--muted); font-size: .75rem; }
+.calendar-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-1) var(--space-3); margin-top: var(--space-2); font-size: .75rem; }
+.calendar-footer .text-link { display: inline-flex; align-items: center; min-height: 2.75rem; }
 .calendar-actions { gap: 0; }
-.calendar-actions .icon-button { min-height: 2.75rem; width: 1.5rem; font-size: 1.2rem; }
+.calendar-actions .icon-button { min-height: 2.75rem; width: 2.75rem; font-size: 1.2rem; }
 #calendar-month { font-size: .625rem; }
 .week-calendar { gap: .15rem; }
 .calendar-day { gap: .35rem; min-height: 3.5rem; padding: var(--space-1) 0; border: 0; border-radius: 0; }
@@ -916,8 +918,12 @@ a.plan-button { display: inline-flex; align-items: center; text-decoration: none
 .session-preview-strip li > div { display: none; }
 .session-preview-strip .exercise-preview { width: 3.1rem; background: transparent; }
 .session-start-overlay { position: absolute; z-index: 1; inset: 0; width: 100%; height: 100%; background: transparent; border: 0; border-radius: inherit; cursor: pointer; }
-.session-card #strength-create { position: relative; z-index: 2; display: inline-flex; margin-top: var(--space-3); }
-.session-card #strength-status:not(:empty) { position: relative; z-index: 2; }
+.session-start-hint { display: flex; justify-content: space-between; align-items: center; margin-top: var(--space-3); color: var(--accent); font-size: .75rem; }
+.session-start-overlay:disabled { cursor: default; }
+.session-card:has(.session-start-overlay:disabled) .session-start-hint { color: var(--muted); }
+.empty-training-day { display: grid; justify-items: start; gap: var(--space-3); }
+.empty-training-day .planner-note { margin: 0; }
+#strength-status:empty { display: none; }
 .mobility-session-card .session-icon { color: #5B51F4; background: #161531; }
 .mobility-preview-strip { display: flex; gap: var(--space-4); margin-top: var(--space-2); overflow: hidden; height: 3.5rem; }
 .mobility-preview-strip svg { width: 2.75rem; height: 3.4rem; stroke: #B7C4B5; stroke-width: 2.5; flex: none; }

@@ -17,13 +17,17 @@ Falls `node` in deiner PowerShell fehlt, kannst du aus dem Repository-Ordner die
 
 Öffne danach die [lokale App](http://127.0.0.1:3000). Beim ersten Aufruf erscheint die Anmeldung. Eine gültige Sitzung öffnet die App direkt.
 
-Die Tageswerte und der wöchentliche Trainingsplan in `app.js` sind Beispieldaten. Das Dashboard wählt den Trainingseintrag anhand des lokalen Wochentags aus. Tage ohne Eintrag erscheinen als Ruhetage.
+Das Dashboard zeigt deine erfassten Tageswerte und die heute geplante Einheit aus deinem aktuellen Trainingsplan. Tageswerte und absolvierte Trainings werden in diesem Browser getrennt nach Konto gespeichert. Die persönlichen Trainingspläne werden über den Server gespeichert.
 
-Unter **Krafttraining** findest du die Übungsbibliothek mit Suche und Filtern für Muskelgruppe und Gerätetyp. Jede Übungsdetailansicht zeigt eine schematische Beispielposition mit Gerät oder Zubehör. Die Übungsdaten liegen in `exercises.js`, die Bildzuordnungen in `exercise-scenes.js`.
+Unter **Training** findest du den Wochenkalender und die zum gewählten Tag passende Krafttrainingseinheit. **Cardio** hat einen eigenen Navigationspunkt. Die Übungsbibliothek ist über den Trainingsplan erreichbar und bietet Suche und Filter für Muskelgruppe und Gerätetyp. Jede Übungsdetailansicht zeigt eine schematische Beispielposition mit Gerät oder Zubehör. Die Übungsdaten liegen in `exercises.js`, die Bildzuordnungen in `exercise-scenes.js`.
 
 ## Trainingsplan
 
-Öffne **Krafttraining → Trainingsplan**. Wähle Split, Einheiten pro Woche, Ziel, Erfahrung und verfügbares Equipment. Der Generator wählt Übungen lokal aus der Bibliothek und variiert die Auswahl bei erneuter Erstellung. Mit **Eigenen Plan erstellen** startest du mit einem leeren Plan und legst deine Einheiten selbst an.
+Öffne **Training → Wöchentliche Trainingstage ändern**. Wähle Split, Einheiten pro Woche, feste Wochentage, verfügbare Zeit, Ziel, Erfahrung und Equipment. Der Generator wählt Übungen lokal aus der Bibliothek und variiert die Auswahl bei erneuter Erstellung. Mit **Eigenen Plan erstellen** startest du mit einem leeren Plan und legst deine Einheiten selbst an.
+
+Jede Einheit wiederholt sich an ihrem eingestellten Wochentag, beispielsweise Oberkörper am Donnerstag und Unterkörper am Sonntag. Im Editor lässt sich der Trainingstag pro Einheit nachträglich ändern. Einheiten ohne festen Tag bleiben im Plan erhalten und lassen sich dort einem Wochentag zuordnen. Freie Kalendertage zeigen einen Ruhetag.
+
+Wähle im Kalender einen früheren Tag, um die dafür geplante Einheit nachzuholen. Das abgeschlossene Training wird diesem Kalendertag zugeordnet, einschließlich Wochenstatistik und Kalender-Markierung. Der tatsächliche Startzeitpunkt wird separat gespeichert und bestimmt den Trainingstimer. Über **Heute** gelangst du zum aktuellen Tag zurück. Eine begonnene Einheit bleibt über **Training läuft** erreichbar, auch wenn du den Kalendertag oder Bereich wechselst.
 
 Im Editor kannst du Einheiten und Übungen hinzufügen, verschieben und entfernen. Zum Hinzufügen stehen Namenssuche und Filter für Muskelgruppe und Equipment bereit. Eigene Übungen lassen sich ebenfalls eintragen.
 

@@ -122,7 +122,7 @@ function renderRoute(focusHeading = false) {
   const showLibrary = location.hash === "#uebungen";
   const showCardio = location.hash === "#cardio";
   const showMobility = location.hash === "#mobility";
-  const navHash = isPlanner || showLibrary || showCardio || showMobility ? "#krafttraining" : location.hash;
+  const navHash = isPlanner || showLibrary || showMobility ? "#krafttraining" : location.hash;
   const active = links.find((link) => link.hash === navHash) ?? links[0];
   const isHome = active === links[0];
   const isStrength = active.hash === "#krafttraining";

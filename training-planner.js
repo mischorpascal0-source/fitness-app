@@ -90,7 +90,7 @@ const trainingPlanner = (() => {
 
   function updateWeekdayHint() {
     const selected = weekdayOptions.querySelectorAll(":checked").length;
-    weekdayHint.textContent = `Wähle ${days.value} Wochentage. ${selected} ausgewählt.`;
+    weekdayHint.textContent = `Wähle ${days.value} feste Wochentage. ${selected} ausgewählt. Dein Plan wiederholt sich jede Woche. Du kannst die Tage später pro Einheit ändern.`;
   }
 
   function applyWeekdays() {
