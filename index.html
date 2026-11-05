@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#070A08">
+  <meta name="theme-color" content="#111727">
   <title>Anmelden · Fitness-App</title>
   <link rel="stylesheet" href="styles.css">
   <script src="exercises.js" defer></script>
@@ -75,7 +75,7 @@
   </main>
   <main class="shell" id="main" hidden>
     <header class="page-header">
-      <div class="header-title"><h1 id="page-title" tabindex="-1">Dashboard</h1><span id="training-state" class="training-state" hidden>● Aktiv</span><time id="today" class="sr-only"></time></div>
+      <div class="header-title"><h1 id="page-title" tabindex="-1">Dashboard</h1><span id="training-state" class="training-state" hidden>Wochenplan</span><time id="today"></time></div>
       <div class="header-actions"><span class="header-streak" id="app-streak" title="Trainingstage in Folge"><svg aria-hidden="true"><use href="#icon-flame"/></svg><strong id="app-streak-count">0</strong></span><button class="icon-button" id="profile-open" type="button" aria-label="Konto und gespeicherte Pläne" aria-haspopup="dialog"><svg aria-hidden="true"><use href="#icon-settings"/></svg></button></div>
     </header>
     <div id="home-view">
@@ -88,12 +88,13 @@
           <button class="home-progress-button" id="weight-open" type="button" aria-haspopup="dialog"><svg aria-hidden="true"><use href="#icon-weight"/></svg>Fortschritt dokumentieren</button>
         </div>
       </section>
-      <section aria-labelledby="overview-title">
+      <section class="home-overview" aria-labelledby="overview-title">
         <div class="section-heading">
-          <h2 class="dashboard-label" id="overview-title">Gewohnheiten</h2>
+          <h2 class="dashboard-label" id="overview-title">Dein Überblick</h2>
         </div>
         <div class="metrics habit-grid">
           <button class="card metric habit-card habit-steps" id="steps" type="button" aria-haspopup="dialog" aria-label="Schritte und Tagesziele bearbeiten">
+            <span class="habit-icon" aria-hidden="true"><svg><use href="#icon-steps"/></svg></span>
             <h3 id="steps-label">Schritte</h3>
             <span class="habit-period">Heute</span>
             <progress aria-labelledby="steps-label"></progress>
@@ -101,30 +102,33 @@
             <div class="habit-footer"><span class="value"></span><svg aria-hidden="true"><use href="#icon-arrow"/></svg></div>
           </button>
           <button class="card metric habit-card habit-calories" id="calories" type="button" aria-label="Ernährungstagebuch öffnen">
+            <span class="habit-icon" aria-hidden="true"><svg><use href="#icon-nutrition"/></svg></span>
             <h3 id="calories-label">Kalorien</h3>
             <span class="habit-period">Heute gegessen</span>
             <div id="home-calorie-ring" class="habit-ring"><span><strong class="value"></strong><small class="goal"></small></span></div>
             <progress class="sr-only" aria-labelledby="calories-label"></progress>
           </button>
           <button class="card habit-card" id="home-weight-open" type="button" aria-haspopup="dialog">
-            <h3>Weigh-in</h3><span class="habit-period">Letzte 30 Tage</span>
+            <span class="habit-icon" aria-hidden="true"><svg><use href="#icon-weight"/></svg></span>
+            <h3>Gewicht</h3><span class="habit-period">Letzte 30 Tage</span>
             <div id="home-weight-heatmap" class="habit-heatmap" aria-hidden="true"></div>
             <div class="habit-footer"><span><strong id="home-weighins">0/7</strong><small> diese Woche</small></span><svg aria-hidden="true"><use href="#icon-arrow"/></svg></div>
           </button>
           <a class="card habit-card habit-trainings" href="#krafttraining">
+            <span class="habit-icon" aria-hidden="true"><svg><use href="#icon-strength"/></svg></span>
             <h3>Trainings</h3><span class="habit-period">Letzte 30 Tage</span>
             <div id="home-training-heatmap" class="habit-heatmap" aria-hidden="true"></div>
             <div class="habit-footer"><span><strong id="home-training-goal">0/0</strong><small> diese Woche</small></span><svg aria-hidden="true"><use href="#icon-arrow"/></svg></div>
           </a>
         </div>
       </section>
-      <section class="home-improve" aria-labelledby="home-improve-title">
-        <h2 class="dashboard-label" id="home-improve-title">Pläne verbessern</h2>
-        <a class="card shortcut" href="#mobility"><span><strong>Deine Mobility-Routine</strong><small>Ein paar Minuten für deine Beweglichkeit.</small></span><svg class="mobility-accent" aria-hidden="true"><use href="#icon-mobility"/></svg></a>
-      </section>
       <section class="training" aria-labelledby="training-title">
         <h2 id="training-title">Heutiges Training</h2>
         <div id="training-card"></div>
+      </section>
+      <section class="home-improve" aria-labelledby="home-improve-title">
+        <h2 class="dashboard-label" id="home-improve-title">Für deine Balance</h2>
+        <a class="card shortcut" href="#mobility"><span><strong>Deine Mobility-Routine</strong><small>Ein paar Minuten für deine Beweglichkeit.</small></span><svg class="mobility-accent" aria-hidden="true"><use href="#icon-mobility"/></svg></a>
       </section>
     </div>
     <section id="strength-dashboard" hidden>
