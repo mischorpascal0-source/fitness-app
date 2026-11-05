@@ -35,6 +35,34 @@ const trainingPlanner = (() => {
   let localPlan = readLocal();
   let plan = localPlan;
   let creating = false;
+  let plannerStep = 0;
+
+  function showPlannerStep(index) {
+    plannerStep = index;
+    const steps = [...settings.querySelectorAll(".planner-step")];
+    steps.forEach((step, stepIndex) => { step.hidden = stepIndex !== index; });
+    document.querySelector("#planner-step-title").textContent = ["Dein Ziel", "Deine Wochenplanung", "Dein Equipment"][index];
+    document.querySelector("#planner-step-description").textContent = [
+      "Worauf möchtest du hinarbeiten und wie lange trainierst du schon?",
+      "Wähle deinen Split, deine Trainingstage und die verfügbare Zeit.",
+      "Womit möchtest du trainieren? Dein Plan richtet sich nach deiner Auswahl.",
+    ][index];
+    document.querySelector("#planner-step-progress").style.width = ((index + 1) / steps.length * 100) + "%";
+    document.querySelector("#planner-step-back").hidden = index === 0;
+    document.querySelector("#planner-step-next").hidden = index === steps.length - 1;
+    document.querySelector("#planner-submit").hidden = index !== steps.length - 1;
+    settingsStatus.textContent = "";
+    steps[index].querySelector("select,input")?.focus();
+  }
+
+  function nextPlannerStep() {
+    if (plannerStep === 1 && checkedWeekdays(weekdayOptions).length !== Number(days.value)) {
+      settingsStatus.textContent = `Wähle genau ${days.value} Trainingstage aus.`;
+      weekdayOptions.querySelector("input").focus();
+      return;
+    }
+    showPlannerStep(plannerStep + 1);
+  }
 
   function fillSelect(select, options) {
     for (const [value, label] of options) select.add(new Option(label, value));
@@ -512,8 +540,11 @@ const trainingPlanner = (() => {
   document.querySelector("#plan-settings-open").addEventListener("click", () => {
     settingsStatus.textContent = "";
     settingsDialog.showModal();
+    showPlannerStep(0);
     settingsDialog.scrollTop = 0;
   });
+  document.querySelector("#planner-step-next").addEventListener("click", nextPlannerStep);
+  document.querySelector("#planner-step-back").addEventListener("click", () => showPlannerStep(plannerStep - 1));
   fillSelect(addGroup, groups.map((group) => [group, group]));
   fillSelect(addEquipment, equipment.map((type) => [type, type]));
   fillSelect(addForm.elements.customEquipment, equipment.map((type) => [type, type]));
@@ -578,6 +609,10 @@ const trainingPlanner = (() => {
 
   settings.addEventListener("submit", (event) => {
     event.preventDefault();
+    if (plannerStep < 2) {
+      nextPlannerStep();
+      return;
+    }
     settingsStatus.textContent = "";
     const selected = [...equipmentOptions.querySelectorAll(":checked")].map((input) => input.value);
     const options = {

@@ -131,6 +131,7 @@
     navigation.hidden = !signedIn;
     userLabel.textContent = account ? `Angemeldet als ${account.username}` : "";
     strengthDashboard.setAccount(account?.id);
+    dailyTracking.setAccount(account?.id);
     trainingPlanner.setWorkspace(workspace, null);
     renderPlanSelect();
     if (account) {
@@ -264,7 +265,11 @@
     const id = planSelect.value;
     if (!await perform(() => selectPlan(id))) renderPlanSelect();
   });
-  openButton.addEventListener("click", trainingPlanner.focusPlan);
+  openButton.addEventListener("click", () => {
+    document.querySelector("#account-dialog").close();
+    location.hash = "#trainingsplan";
+    requestAnimationFrame(trainingPlanner.focusPlan);
+  });
   deleteButton.addEventListener("click", () => {
     if (!selected || !window.confirm(`„${selected.plan.name}“ aus deinem Konto löschen?`)) return;
     perform(async () => {

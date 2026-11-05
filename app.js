@@ -1,29 +1,19 @@
-const sampleData = {
-  steps: { value: 6420, goal: 8000 },
-  calorieIntake: { value: 1480, goal: 2200 },
-};
-
-const number = new Intl.NumberFormat("de-DE");
 const dateFormat = new Intl.DateTimeFormat("de-DE", { dateStyle: "full" });
 const date = document.querySelector("#today");
 const appShell = document.querySelector("#main");
 const heading = document.querySelector("#page-title");
 const home = document.querySelector("#home-view");
-const category = document.querySelector("#category");
+const cardio = document.querySelector("#cardio-view");
+const nutrition = document.querySelector("#nutrition-view");
+const mobility = document.querySelector("#mobility-view");
 const strength = document.querySelector("#strength-dashboard");
 const library = document.querySelector("#exercise-library");
 const planner = document.querySelector("#training-planner");
 const exerciseDetail = document.querySelector("#exercise-detail");
 const links = [...document.querySelectorAll(".bottom-nav a")];
-
-function renderMetric(id, metric, unit, goalText) {
-  const card = document.getElementById(id);
-  card.querySelector(".value").textContent = number.format(metric.value) + unit;
-  card.querySelector(".goal").textContent = goalText + number.format(metric.goal) + unit;
-  const progress = card.querySelector("progress");
-  progress.max = metric.goal;
-  progress.value = metric.value;
-}
+const accountDialog = document.querySelector("#account-dialog");
+accountDialog.append(document.querySelector("#plan-account"));
+document.querySelector("#profile-open").addEventListener("click", () => accountDialog.showModal());
 
 function renderToday() {
   const now = new Date();
@@ -35,6 +25,7 @@ function renderToday() {
   date.dateTime = dateKey;
   date.textContent = dateFormat.format(now);
   strengthDashboard.render();
+  dailyTracking.render();
   renderScheduledTraining(now);
 }
 
@@ -73,10 +64,10 @@ function renderRoute(focusHeading = false) {
   strength.hidden = !showStrength;
   if (showStrength) strengthDashboard.render();
   planner.hidden = !isPlanner;
-  category.hidden = isHome || isStrength;
-  if (!category.hidden) {
-    category.querySelector("use").setAttribute("href", active.querySelector("use").getAttribute("href"));
-  }
+  cardio.hidden = active.hash !== "#cardio";
+  nutrition.hidden = active.hash !== "#ernaehrung";
+  mobility.hidden = active.hash !== "#mobility";
+  dailyTracking.render();
   heading.textContent = isPlanner ? "Trainingsplan" : showLibrary ? "Übungsbibliothek" : active.dataset.title;
   document.title = `${heading.textContent} · Fitness-App`;
   for (const link of links) {
@@ -89,8 +80,6 @@ function renderRoute(focusHeading = false) {
   }
 }
 
-renderMetric("steps", sampleData.steps, "", "Ziel ");
-renderMetric("calories", sampleData.calorieIntake, " kcal", "Ziel ");
 renderToday();
 renderRoute();
 document.addEventListener("fitness:planchange", () => { if (!home.hidden) renderScheduledTraining(); });

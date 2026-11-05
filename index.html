@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#191D2B">
+  <meta name="theme-color" content="#101010">
   <title>Anmelden · Fitness-App</title>
   <link rel="stylesheet" href="styles.css">
   <script src="exercises.js" defer></script>
@@ -15,12 +15,17 @@
   <script src="training-planner.js" defer></script>
   <script src="exercise-library.js" defer></script>
   <script src="strength-dashboard.js" defer></script>
+  <script src="daily-tracking.js" defer></script>
   <script src="app.js" defer></script>
   <script src="account-plans.js" defer></script>
 </head>
 <body>
   <svg class="icons" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
     <symbol id="icon-home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></symbol>
+    <symbol id="icon-profile" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></symbol>
+    <symbol id="icon-mobility" viewBox="0 0 24 24"><circle cx="12" cy="4" r="2"/><path d="m4 9 8 2 8-2m-8 2v5m0 0-6 5m6-5 6 5"/></symbol>
+    <symbol id="icon-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/></symbol>
+    <symbol id="icon-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
     <symbol id="icon-strength" viewBox="0 0 24 24"><path d="M7 6v12M4 8v8m13-10v12m3-10v8M7 12h10M2 12h2m16 0h2"/></symbol>
     <symbol id="icon-cardio" viewBox="0 0 24 24"><path d="M2 12h5l3-7 4 14 3-7h5"/></symbol>
     <symbol id="icon-nutrition" viewBox="0 0 24 24"><path d="M4 3v5a3 3 0 0 0 6 0V3M7 3v18m12 0V3c-3 1-5 5-5 9h5"/></symbol>
@@ -66,15 +71,14 @@
   </main>
   <main class="shell" id="main" hidden>
     <header class="page-header">
-      <div class="app-brand"><span class="brand-mark"><svg aria-hidden="true"><use href="#icon-cardio"/></svg></span>Fitness-App</div>
-      <h1 id="page-title" tabindex="-1">Home</h1>
-      <time id="today"></time>
+      <div><div class="app-brand">DEIN PERSÖNLICHER FORTSCHRITT</div><h1 id="page-title" tabindex="-1">Home</h1><time id="today"></time></div>
+      <button class="icon-button" id="profile-open" type="button" aria-label="Konto und gespeicherte Pläne" aria-haspopup="dialog"><svg aria-hidden="true"><use href="#icon-profile"/></svg></button>
     </header>
     <div id="home-view">
       <section aria-labelledby="overview-title">
         <div class="section-heading">
           <h2 id="overview-title">Tagesübersicht</h2>
-          <span class="badge">Beispieldaten</span>
+          <button class="text-button" id="daily-open" type="button" aria-haspopup="dialog">Tagesziele bearbeiten</button>
         </div>
         <div class="metrics">
           <article class="card metric" id="steps">
@@ -97,18 +101,38 @@
         <h2 id="training-title">Heutiges Training</h2>
         <div id="training-card"></div>
       </section>
+      <section class="home-shortcuts" aria-label="Deine Bereiche">
+        <a class="card shortcut" href="#ernaehrung"><svg aria-hidden="true"><use href="#icon-nutrition"/></svg><span><strong>Ernährung</strong><small>Dein Tag auf einen Blick</small></span><svg aria-hidden="true"><use href="#icon-arrow"/></svg></a>
+        <a class="card shortcut" href="#mobility"><svg aria-hidden="true"><use href="#icon-mobility"/></svg><span><strong>Mobility</strong><small>Zeit für Beweglichkeit</small></span><svg aria-hidden="true"><use href="#icon-arrow"/></svg></a>
+      </section>
     </div>
     <section id="strength-dashboard" hidden>
+      <section class="card library-panel calendar-panel" aria-label="Trainingskalender">
+        <div class="section-heading"><h2>Deine Woche</h2><div class="calendar-actions"><button id="calendar-prev" class="icon-button" type="button" aria-label="Vorherige Woche">‹</button><span id="calendar-month"></span><button id="calendar-next" class="icon-button" type="button" aria-label="Nächste Woche">›</button></div></div>
+        <div id="strength-calendar" class="week-calendar"></div>
+      </section>
       <section class="card library-panel" aria-labelledby="strength-today">
-        <h2 id="strength-today">Heute</h2>
+        <div class="section-heading"><span class="eyebrow">Dein nächstes Training</span><a class="text-link" href="#trainingsplan">Plan bearbeiten</a></div>
+        <h2 id="strength-today">Krafttraining</h2>
         <p id="strength-schedule"></p>
         <label class="plan-editor-label" id="strength-session-field" hidden>Trainingseinheit
           <select id="strength-session"></select>
         </label>
+        <div class="session-facts" id="strength-session-facts"></div>
         <div class="planner-actions">
           <button class="plan-button primary" id="strength-start" type="button" aria-haspopup="dialog" hidden>Training starten</button>
-          <a class="plan-button" href="#trainingsplan">Trainingsplan öffnen</a>
+          <a class="plan-button" id="strength-create" href="#trainingsplan">Trainingsplan öffnen</a>
         </div>
+        <details id="strength-preview-details" class="session-customize">
+          <summary>Übungen ansehen</summary>
+          <ul id="strength-session-preview" class="session-preview"></ul>
+        </details>
+        <details id="strength-customize" class="session-customize">
+          <summary>Training heute anpassen</summary>
+          <label class="plan-editor-label" for="workout-minutes">Zeit pro Training <output id="workout-minutes-value"></output></label>
+          <input id="workout-minutes" type="range" min="20" max="120" step="5" value="45">
+          <fieldset class="training-days"><legend>Equipment für heute</legend><div id="workout-equipment" class="plan-equipment-options"></div></fieldset>
+        </details>
         <p id="strength-status" class="planner-note" role="status"></p>
       </section>
       <section class="card library-panel" aria-labelledby="strength-week">
@@ -123,6 +147,35 @@
         <ul id="strength-muscle-sets"></ul>
         <p id="strength-week-empty" class="planner-note">Für diese Woche sind noch keine Sätze erfasst.</p>
       </section>
+      <section class="card library-panel" id="strength-history-panel">
+        <div class="section-heading"><h2>Letzte Trainings</h2><span class="eyebrow" id="strength-streak"></span></div>
+        <ul id="strength-history" class="entry-list"></ul>
+        <p id="strength-history-empty" class="planner-note">Dein erstes abgeschlossenes Training erscheint hier.</p>
+      </section>
+    </section>
+    <section id="nutrition-view" hidden>
+      <div class="section-heading"><h2>Dein Ernährungstagebuch</h2><label class="date-control"><span class="sr-only">Datum für Ernährung</span><input id="nutrition-date" type="date"></label></div>
+      <section class="card library-panel">
+        <div class="calorie-overview"><div class="calorie-ring" id="nutrition-ring"><span><strong id="nutrition-remaining">0</strong><small>kcal übrig</small></span></div><div class="calorie-detail"><span>Gegessen</span><strong id="nutrition-eaten">0 kcal</strong><span>Tagesziel</span><strong id="nutrition-goal">2.200 kcal</strong></div></div>
+        <div class="macro-grid" id="nutrition-macros"></div>
+      </section>
+      <div class="section-heading"><h2>Deine Mahlzeiten</h2><button class="plan-button primary" id="food-open" type="button" aria-haspopup="dialog">+ Eintragen</button></div>
+      <div id="nutrition-meals" class="meal-list"></div>
+      <p id="nutrition-status" class="planner-note" role="status"></p>
+    </section>
+    <section id="cardio-view" hidden>
+      <section class="card library-panel">
+        <div class="section-heading"><span class="eyebrow">In Bewegung bleiben</span><svg aria-hidden="true"><use href="#icon-cardio"/></svg></div>
+        <h2>Jede Einheit zählt.</h2><p class="planner-note">Halte deine Ausdaueraktivitäten fest und sieh deine Woche wachsen.</p>
+        <div class="planner-actions"><button id="cardio-open" class="plan-button primary" type="button" aria-haspopup="dialog">Aktivität eintragen</button></div>
+      </section>
+      <section class="card library-panel"><h2>Deine Woche</h2><dl class="strength-totals"><div><dt>Aktive Minuten</dt><dd id="cardio-minutes">0</dd></div><div><dt>Kilometer</dt><dd id="cardio-distance">0</dd></div></dl><div id="cardio-chart" class="activity-chart" aria-label="Aktivitätsminuten pro Wochentag"></div></section>
+      <section class="card library-panel"><h2>Letzte Aktivitäten</h2><ul id="cardio-history" class="entry-list"></ul><p id="cardio-empty" class="planner-note">Trage deine erste Aktivität ein.</p></section>
+      <p id="cardio-status" class="planner-note" role="status"></p>
+    </section>
+    <section id="mobility-view" hidden>
+      <section class="card library-panel"><span class="eyebrow">Deine tägliche Routine</span><h2>Mehr Bewegung.<br>Ein paar Minuten für dich.</h2><p class="planner-note">Eine kurze Routine für Schultern, Rücken, Hüfte und Waden.</p><div class="planner-actions"><button id="mobility-start" class="plan-button primary" type="button">Routine starten</button></div><p id="mobility-status" class="planner-note" role="status"></p></section>
+      <div id="mobility-exercises" class="mobility-list"></div>
     </section>
     <section id="exercise-library" aria-labelledby="library-title" hidden>
       <a class="text-link" href="#trainingsplan">← Zum Trainingsplan</a>
@@ -181,6 +234,7 @@
           </details>
         </div>
         <p id="account-status" class="planner-note" role="status"></p>
+        <p class="planner-note">Deine Trainingspläne werden im Konto gespeichert. Trainings-, Ernährungs- und Aktivitätsprotokolle liegen in diesem Browser.</p>
       </section>
       <section class="card library-panel">
         <h2>Plan erstellen</h2>
@@ -210,17 +264,14 @@
       </aside>
       <div id="plan-result" tabindex="-1"></div>
     </section>
-    <section id="category" class="card placeholder" hidden>
-      <span class="icon-tile"><svg aria-hidden="true"><use/></svg></span>
-      <div><h2>In Vorbereitung</h2><p>Dieser Bereich befindet sich im Aufbau.</p></div>
-    </section>
   </main>
   <nav class="bottom-nav" aria-label="Hauptnavigation" hidden>
     <div class="nav-inner">
       <a href="#home" data-title="Home" aria-current="page"><svg aria-hidden="true"><use href="#icon-home"/></svg>Home</a>
-      <a href="#krafttraining" data-title="Krafttraining"><svg aria-hidden="true"><use href="#icon-strength"/></svg>Krafttraining</a>
+      <a href="#krafttraining" data-title="Krafttraining"><svg aria-hidden="true"><use href="#icon-strength"/></svg>Training</a>
       <a href="#cardio" data-title="Cardio"><svg aria-hidden="true"><use href="#icon-cardio"/></svg>Cardio</a>
       <a href="#ernaehrung" data-title="Ernährung"><svg aria-hidden="true"><use href="#icon-nutrition"/></svg>Ernährung</a>
+      <a href="#mobility" data-title="Mobility"><svg aria-hidden="true"><use href="#icon-mobility"/></svg>Mobility</a>
     </div>
   </nav>
   <dialog id="exercise-detail" aria-labelledby="exercise-detail-title">
@@ -246,7 +297,8 @@
       <h2 id="strength-workout-title">Training</h2>
       <form method="dialog"><button class="plan-button" type="submit">Schließen</button></form>
     </div>
-    <p class="planner-note">Hake jeden Satz ab, den du gemacht hast.</p>
+    <div class="workout-timer-bar"><span><svg aria-hidden="true"><use href="#icon-clock"/></svg><output id="workout-elapsed">00:00</output></span><button class="text-button" id="workout-rest-skip" type="button" hidden><span id="workout-rest"></span> · Pause beenden</button></div>
+    <p class="planner-note">Trage Gewicht und Wiederholungen ein und hake deine Sätze ab.</p>
     <div id="strength-workout-exercises"></div>
     <p id="strength-workout-status" class="planner-note" role="status"></p>
     <div class="planner-actions">
@@ -254,42 +306,92 @@
       <button id="strength-discard" class="plan-button" type="button">Training verwerfen</button>
     </div>
   </dialog>
+  <button id="active-workout" class="active-workout" type="button" hidden><span class="live-dot"></span><span><strong>Training läuft</strong><small id="active-workout-name"></small></span><svg aria-hidden="true"><use href="#icon-arrow"/></svg></button>
+  <dialog id="account-dialog" aria-labelledby="account-dialog-title"><div class="detail-header"><h2 id="account-dialog-title">Dein Konto</h2><form method="dialog"><button class="plan-button" type="submit">Schließen</button></form></div></dialog>
+  <dialog id="daily-dialog" aria-labelledby="daily-title">
+    <div class="detail-header"><h2 id="daily-title">Deine Tagesziele</h2><form method="dialog"><button class="plan-button">Schließen</button></form></div>
+    <form id="daily-form" class="library-controls">
+      <label>Schritte heute <input name="steps" type="number" min="0" max="100000" required></label>
+      <label>Schrittziel <input name="stepGoal" type="number" min="1" max="100000" required></label>
+      <label>Kalorienziel in kcal <input name="calorieGoal" type="number" min="1" max="20000" required></label>
+      <p class="planner-note">Deine Ziele bestimmst du selbst. Die gegessenen Kalorien ergeben sich aus deinem Ernährungstagebuch.</p>
+      <button class="plan-button primary" type="submit">Speichern</button>
+      <p class="planner-note form-status" role="status"></p>
+    </form>
+  </dialog>
+  <dialog id="food-dialog" aria-labelledby="food-title">
+    <div class="detail-header"><h2 id="food-title">Essen eintragen</h2><form method="dialog"><button class="plan-button">Schließen</button></form></div>
+    <form id="food-form" class="library-controls">
+      <label class="full-row">Lebensmittel oder Mahlzeit <input name="foodName" maxlength="100" placeholder="z. B. Haferflocken mit Joghurt" required></label>
+      <label>Mahlzeit <select name="meal"><option>Frühstück</option><option>Mittagessen</option><option>Abendessen</option><option>Snacks</option></select></label>
+      <label>Kalorien in kcal <input name="calories" type="number" min="0" max="20000" step="1" required></label>
+      <label>Protein in g <input name="protein" type="number" min="0" max="2000" step=".1" value="0" required></label>
+      <label>Kohlenhydrate in g <input name="carbs" type="number" min="0" max="2000" step=".1" value="0" required></label>
+      <label>Fett in g <input name="fat" type="number" min="0" max="2000" step=".1" value="0" required></label>
+      <button class="plan-button primary full-row" type="submit">Zum Tagebuch hinzufügen</button><p class="planner-note form-status full-row" role="status"></p>
+    </form>
+  </dialog>
+  <dialog id="cardio-dialog" aria-labelledby="cardio-title">
+    <div class="detail-header"><h2 id="cardio-title">Aktivität eintragen</h2><form method="dialog"><button class="plan-button">Schließen</button></form></div>
+    <form id="cardio-form" class="library-controls">
+      <label>Aktivität <select name="activity"><option>Laufen</option><option>Radfahren</option><option>Spazierengehen</option><option>Schwimmen</option><option>Crosstrainer</option><option>Rudern</option><option>Andere Aktivität</option></select></label>
+      <label>Datum <input name="date" type="date" required></label>
+      <label>Dauer in Minuten <input name="minutes" type="number" min="1" max="1440" required></label>
+      <label>Strecke in km <input name="distance" type="number" min="0" max="2000" step=".01" value="0" required></label>
+      <button class="plan-button primary full-row" type="submit">Aktivität speichern</button><p class="planner-note form-status full-row" role="status"></p>
+    </form>
+  </dialog>
   <dialog id="plan-settings-dialog" aria-labelledby="plan-settings-title">
     <div class="detail-header">
-      <h2 id="plan-settings-title">Trainingsplan erstellen</h2>
+      <h2 id="plan-settings-title">Dein neuer Trainingsplan</h2>
       <form method="dialog"><button class="plan-button" type="submit">Schließen</button></form>
     </div>
     <form id="plan-settings">
-      <div class="planner-settings library-controls">
-        <label>Trainingssplit <select name="split" autofocus></select></label>
-        <label>Einheiten pro Woche <select name="days"></select></label>
-        <label>Ziel <select name="goal"></select></label>
-        <label>Erfahrung <select name="level"></select></label>
-      </div>
-      <fieldset class="training-days" aria-describedby="plan-weekdays-hint">
-        <legend>Trainingstage</legend>
-        <div id="plan-weekdays" class="plan-equipment-options"></div>
-        <p id="plan-weekdays-hint" class="planner-note"></p>
-      </fieldset>
-      <div class="plan-duration">
-        <div class="plan-duration-heading">
-          <label for="plan-minutes">Wie viel Zeit hast du pro Training?</label>
-          <output id="plan-minutes-value" for="plan-minutes" aria-live="off"></output>
+      <div class="planner-dialog-progress" aria-hidden="true"><span id="planner-step-progress"></span></div>
+      <h3 id="planner-step-title">Dein Ziel</h3>
+      <p class="plan-step-description" id="planner-step-description"></p>
+      <div class="planner-step">
+        <div class="planner-settings library-controls">
+          <label>Ziel <select name="goal"></select></label>
+          <label>Erfahrung <select name="level"></select></label>
         </div>
-        <input id="plan-minutes" name="minutes" type="range" aria-describedby="plan-duration-note">
-        <p class="planner-note" id="plan-duration-note">Wir rechnen mit etwa 1 Minute pro Satz und 3 Minuten Pause zwischen den Sätzen.</p>
       </div>
-      <details class="plan-equipment">
-        <summary>Verfügbares Equipment <span id="plan-equipment-count"></span></summary>
-        <div class="planner-actions">
-          <button class="plan-button" type="button" id="plan-equipment-all">Alle auswählen</button>
-          <button class="plan-button" type="button" id="plan-equipment-clear">Auswahl leeren</button>
+      <div class="planner-step" hidden>
+        <div class="planner-settings library-controls">
+          <label>Trainingssplit <select name="split"></select></label>
+          <label>Einheiten pro Woche <select name="days"></select></label>
         </div>
-        <div class="plan-equipment-options"></div>
-        <p class="planner-note">Prüfe das Zubehör der ausgewählten Übungen, etwa eine Bank oder Klimmzugstange.</p>
-      </details>
+        <fieldset class="training-days" aria-describedby="plan-weekdays-hint">
+          <legend>Trainingstage</legend>
+          <div id="plan-weekdays" class="plan-equipment-options"></div>
+          <p id="plan-weekdays-hint" class="planner-note"></p>
+        </fieldset>
+        <div class="plan-duration">
+          <div class="plan-duration-heading">
+            <label for="plan-minutes">Wie viel Zeit hast du pro Training?</label>
+            <output id="plan-minutes-value" for="plan-minutes" aria-live="off"></output>
+          </div>
+          <input id="plan-minutes" name="minutes" type="range" aria-describedby="plan-duration-note">
+          <p class="planner-note" id="plan-duration-note">Wir rechnen mit etwa 1 Minute pro Satz und 3 Minuten Pause zwischen den Sätzen.</p>
+        </div>
+      </div>
+      <div class="planner-step" hidden>
+        <details class="plan-equipment" open>
+          <summary>Verfügbares Equipment <span id="plan-equipment-count"></span></summary>
+          <div class="planner-actions">
+            <button class="plan-button" type="button" id="plan-equipment-all">Alle auswählen</button>
+            <button class="plan-button" type="button" id="plan-equipment-clear">Auswahl leeren</button>
+          </div>
+          <div class="plan-equipment-options"></div>
+          <p class="planner-note">Prüfe das Zubehör der ausgewählten Übungen, etwa eine Bank oder Klimmzugstange.</p>
+        </details>
+      </div>
       <p id="plan-settings-status" class="planner-note" role="status"></p>
-      <div class="planner-actions"><button class="plan-button primary" type="submit">Plan erstellen</button></div>
+      <div class="planner-step-actions">
+        <button id="planner-step-back" class="plan-button" type="button" hidden>Zurück</button>
+        <button id="planner-step-next" class="plan-button primary" type="button">Weiter</button>
+        <button id="planner-submit" class="plan-button primary" type="submit" hidden>Plan erstellen</button>
+      </div>
     </form>
   </dialog>
   <dialog id="plan-add-dialog" aria-labelledby="plan-add-title">
