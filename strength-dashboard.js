@@ -25,6 +25,9 @@ const strengthDashboard = (() => {
   const equipmentChoices = document.querySelector("#workout-equipment");
   const activeWidget = document.querySelector("#active-workout");
   const restSkip = document.querySelector("#workout-rest-skip");
+  const optionsDialog = document.querySelector("#strength-options-dialog");
+  const historyDialog = document.querySelector("#strength-history-dialog");
+  const activityDialog = document.querySelector("#activity-dialog");
   const catalog = new Map(exerciseCatalog.map((exercise) => [exercise.id, exercise]));
   const shortDate = new Intl.DateTimeFormat("de-DE", { day: "numeric", month: "short" });
   let storageKey;
@@ -71,6 +74,7 @@ const strengthDashboard = (() => {
     try {
       localStorage.setItem(storageKey, JSON.stringify(next));
       journal = next;
+      document.dispatchEvent(new Event("fitness:workoutchange"));
       return true;
     } catch {
       messageElement.textContent = "Das Training konnte in diesem Browser nicht gespeichert werden.";
@@ -117,6 +121,7 @@ const strengthDashboard = (() => {
     const now = dateKey(new Date());
     const completed = new Set(journal.workouts.map(({ date }) => date));
     document.querySelector("#calendar-month").textContent = new Intl.DateTimeFormat("de-DE", { month: "short", year: "numeric" }).format(selectedDate);
+    document.querySelector("#calendar-selected-date").textContent = new Intl.DateTimeFormat("de-DE", { day: "numeric", month: "short", year: "numeric" }).format(selectedDate);
     calendar.replaceChildren(...trainingPlanData.weekdays.map((label, index) => {
       const date = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate() - day + index);
       const key = dateKey(date);
@@ -132,7 +137,7 @@ const strengthDashboard = (() => {
       const name = document.createElement("small");
       name.textContent = label.slice(0, 2);
       const number = document.createElement("strong");
-      number.textContent = date.getDate();
+      number.textContent = completed.has(key) && key !== dateKey(selectedDate) ? "✓" : date.getDate();
       const dot = document.createElement("span");
       dot.className = "calendar-dot";
       button.append(name, number, dot);
@@ -174,16 +179,24 @@ const strengthDashboard = (() => {
   function renderSelectedSession() {
     const session = trainingPlanner.getPlan()?.sessions[sessionSelect.value];
     const exercises = journal.active?.exercises ?? (session ? exercisesForToday(session) : []);
-    document.querySelector("#strength-today").textContent = journal.active?.name ?? session?.name ?? "Dein Trainingsplan";
+    const name = journal.active?.name ?? session?.name ?? "Dein Trainingsplan";
+    document.querySelector("#strength-today").textContent = name;
+    start.setAttribute("aria-label", name + (journal.active ? " fortsetzen" : " starten"));
     const sets = exercises.reduce((sum, entry) => sum + (entry.sets ?? entry.done.length), 0);
-    facts.replaceChildren(...[exercises.length + " Übungen", sets + " Sätze", "ca. " + trainingPlanData.estimateMinutes(sets) + " Min."].map((text) => {
+    facts.replaceChildren(...[
+      ["#icon-clock", trainingPlanData.estimateMinutes(sets) + " Minuten"],
+      ["#icon-strength", exercises.length + " Übungen"],
+    ].map(([icon, text]) => {
       const chip = document.createElement("span");
-      chip.className = "fact-chip";
-      chip.textContent = text;
+      chip.innerHTML = '<svg aria-hidden="true"><use href="' + icon + '"/></svg>';
+      chip.append(text);
       return chip;
     }));
     facts.hidden = !exercises.length;
-    document.querySelector("#strength-preview-details").hidden = !exercises.length;
+    const muscles = document.querySelector("#strength-session-muscles");
+    muscles.textContent = [...new Set(exercises.flatMap((entry) => entry.muscles ?? primaryMuscles(catalog.get(entry.id))))].join(", ");
+    muscles.title = muscles.textContent;
+    muscles.hidden = !exercises.length;
     preview.replaceChildren(...exercises.map((entry) => {
       const exercise = catalog.get(entry.id);
       const row = document.createElement("li");
@@ -233,7 +246,7 @@ const strengthDashboard = (() => {
     activeWidget.hidden = !storageKey || !journal?.active;
     document.body.classList.toggle("has-active-workout", Boolean(storageKey && journal?.active));
     document.querySelector("#active-workout-name").textContent = journal?.active?.name ?? "";
-    if (section.hidden || !journal) return;
+    if (!journal || (section.hidden && document.querySelector("#statistics-view").hidden)) return;
     const now = selectedDate;
     const today = dateKey(now);
     const weekday = (now.getDay() + 6) % 7;
@@ -245,6 +258,7 @@ const strengthDashboard = (() => {
     if (scheduled.length) schedule.textContent = `${dayLabel} geplant · ${scheduled.map(({ name }) => name).join(" · ")}`;
     else if (plan) schedule.textContent = dayLabel + (dayLabel === "Heute" ? " ist kein Training eingeplant." : " · Kein Training eingeplant.");
     else schedule.textContent = "Erstelle einen Trainingsplan, um eine Einheit zu starten.";
+    schedule.classList.toggle("sr-only", scheduled.length > 0);
 
     const preferred = available.find(({ session }) => session.weekday === weekday) ?? available[0];
     const selection = shownPlan === plan && shownDate === today ? sessionSelect.value : "";
@@ -256,7 +270,7 @@ const strengthDashboard = (() => {
     shownDate = today;
     sessionField.hidden = Boolean(journal.active) || !available.length;
     start.hidden = !storageKey || (!journal.active && !available.length);
-    start.textContent = journal.active ? "Training fortsetzen" : "Training starten";
+    start.querySelector(".sr-only").textContent = journal.active ? "Training fortsetzen" : "Training starten";
     document.querySelector("#strength-create").hidden = Boolean(plan?.sessions.length);
     renderCalendar(plan);
     renderSelectedSession();
@@ -382,6 +396,8 @@ const strengthDashboard = (() => {
       if (!writeJournal({ ...journal, active }, status)) return;
     }
     renderWorkout();
+    if (optionsDialog.open) optionsDialog.close();
+    if (activityDialog.open) activityDialog.close();
     dialog.showModal();
     dialog.scrollTop = 0;
     render();
@@ -424,6 +440,14 @@ const strengthDashboard = (() => {
   });
 
   document.addEventListener("fitness:planchange", render);
+  document.querySelector("#strength-menu").addEventListener("click", () => optionsDialog.showModal());
+  document.querySelector("#strength-saved").addEventListener("click", () => historyDialog.showModal());
+  document.querySelector("#strength-add-activity").addEventListener("click", () => activityDialog.showModal());
+  document.querySelector("#activity-strength").addEventListener("click", () => {
+    activityDialog.close();
+    if (trainingPlanner.getPlan()?.sessions.some(({ exercises }) => exercises.length)) optionsDialog.showModal();
+    else location.hash = "#trainingsplan";
+  });
   for (const [selector, offset] of [["#calendar-prev", -7], ["#calendar-next", 7]]) {
     document.querySelector(selector).addEventListener("click", () => {
       selectedDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate() + offset);
@@ -469,8 +493,11 @@ const strengthDashboard = (() => {
 
   return {
     render,
+    getTrainingDates: () => journal?.workouts.map(({ date }) => date) ?? [],
     close() {
-      if (dialog.open) dialog.close();
+      for (const sheet of [dialog, optionsDialog, historyDialog, activityDialog]) {
+        if (sheet.open) sheet.close();
+      }
       shownPlan = undefined;
     },
     setAccount(id) {
@@ -481,6 +508,7 @@ const strengthDashboard = (() => {
       shownPlan = undefined;
       status.textContent = "";
       render();
+      document.dispatchEvent(new Event("fitness:workoutchange"));
     },
   };
 })();
