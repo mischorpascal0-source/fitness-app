@@ -1,0 +1,27 @@
+#garmin-cardio { border-top: 3px solid var(--accent); }
+#garmin-cardio h2 { font-size: clamp(1.7rem, 6vw, 2.5rem); line-height: 1.12; max-width: 16ch; margin-block: 18px 12px; }
+#garmin-cardio details { margin-block: 20px; padding: 16px; border: 1px solid #ffffff26; border-radius: 14px; }
+#garmin-cardio summary { cursor: pointer; font-weight: 650; }
+#garmin-cardio input, #garmin-cardio select { width: 100%; min-width: 0; }
+#garmin-cardio a { color: var(--accent); text-underline-offset: 3px; }
+#garmin-cardio .garmin-badge { padding: 5px 10px; border-radius: 99px; background: #ffffff0d; color: #b8c1b9; font-size: .72rem; text-transform: none; }
+#garmin-cardio .garmin-badge[data-connected="true"] { background: #c5b8ff20; color: var(--accent); }
+#garmin-cardio .garmin-history-heading { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px; margin-top: 28px; }
+#garmin-cardio .garmin-history-heading h3 { margin: 0 0 8px; }
+#garmin-cardio .garmin-history-heading label { display: grid; gap: 6px; font-size: .8rem; }
+#garmin-cardio .garmin-totals { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; margin-block: 18px; }
+#garmin-cardio .garmin-totals > div { background: #ffffff06; border: 1px solid #ffffff12; padding: 14px 10px; border-radius: 12px; }
+#garmin-cardio dt { font-size: .75rem; color: #aeb9b0; }
+#garmin-cardio dd { margin: 8px 0 0; font-size: 1.15rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+#garmin-cardio .garmin-runs { list-style: none; padding: 0; display: grid; gap: 12px; }
+#garmin-cardio .garmin-run { border: 1px solid #ffffff1c; border-radius: 14px; padding: 16px; }
+#garmin-cardio .garmin-run h4 { font-size: 1rem; margin: 6px 0 12px; overflow-wrap: anywhere; }
+#garmin-cardio .garmin-run time { color: #aeb9b0; font-size: .8rem; }
+#garmin-cardio .garmin-run dl { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px 8px; margin: 12px 0; }
+#garmin-cardio .garmin-run dd { font-size: .95rem; }
+#garmin-cardio .garmin-source { display: block; margin-top: 12px; font-size: .75rem; color: #aeb9b0; }
+#garmin-cardio #garmin-status { min-height: 1.4em; }
+@media (max-width: 480px) {
+  #garmin-cardio .garmin-totals { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  #garmin-cardio .planner-actions > button { width: 100%; }
+}

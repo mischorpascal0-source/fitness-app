@@ -132,6 +132,7 @@
     userLabel.textContent = account ? `Angemeldet als ${account.username}` : "";
     strengthDashboard.setAccount(account?.id);
     dailyTracking.setAccount(account?.id);
+    cardioGarmin.setAccount(account?.id);
     trainingPlanner.setWorkspace(workspace, null);
     renderPlanSelect();
     if (account) {

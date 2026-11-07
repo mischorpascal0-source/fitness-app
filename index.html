@@ -6,6 +6,8 @@
   <meta name="theme-color" content="#111727">
   <title>Anmelden · Fitness-App</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="cardio-garmin.css">
+  <script src="cardio-garmin.js" defer></script>
   <script src="exercises.js" defer></script>
   <script src="exercise-scenes.js" defer></script>
   <script src="exercise-illustrations.js" defer></script>
@@ -236,6 +238,31 @@
       <p id="nutrition-status" class="planner-note" role="status"></p>
     </section>
     <section id="cardio-view" hidden>
+      <section id="garmin-cardio" class="card library-panel" aria-labelledby="garmin-heading">
+        <div class="section-heading"><span class="eyebrow">Dein Lauftraining</span><span id="garmin-state" class="garmin-badge">Nicht verbunden</span></div>
+        <h2 id="garmin-heading">Deine Läufe. Im Überblick.</h2>
+        <p class="planner-note">Verbinde Garmin Connect und hole deine letzten 100 Läufe direkt in dein Trainingstagebuch.</p>
+        <details id="garmin-setup" open>
+          <summary>Garmin verbinden</summary>
+          <p class="planner-note">Erstelle in <a href="https://connect.garmin.com/app/settings/personalApiToken" target="_blank" rel="noopener noreferrer">Garmin Connect einen persönlichen API-Schlüssel</a> und füge ihn hier ein. Dein Garmin-Passwort wird nicht benötigt.</p>
+          <form id="garmin-connect-form" class="library-controls">
+            <label>Persönlicher Garmin API-Schlüssel<input id="garmin-key" type="password" autocomplete="off" spellcheck="false" maxlength="2048" required aria-describedby="garmin-key-hint"></label>
+            <p id="garmin-key-hint" class="planner-note">Der Schlüssel wird nur für diese geöffnete Sitzung verwendet und nicht gespeichert. Nach Neuladen oder Abmelden verbindest du dich erneut. Die Laufdaten bleiben auf diesem Gerät in deinem App-Konto.</p>
+            <button type="submit" class="plan-button primary">Verbinden &amp; Läufe laden</button>
+          </form>
+        </details>
+        <div class="planner-actions">
+          <button id="garmin-sync" class="plan-button primary" type="button" hidden>Jetzt synchronisieren</button>
+          <button id="garmin-disconnect" class="plan-button" type="button" hidden>Trennen &amp; Laufdaten entfernen</button>
+        </div>
+        <p id="garmin-status" class="planner-note" role="status" aria-live="polite"></p>
+        <div class="garmin-history-heading"><h3>Garmin-Läufe</h3><label>Zeitraum<select id="garmin-period"><option value="30">Letzte 30 Tage</option><option value="90">Letzte 90 Tage</option><option value="all">Alle geladenen Läufe</option></select></label></div>
+        <dl class="garmin-totals"><div><dt>Läufe</dt><dd id="garmin-total-runs">0</dd></div><div><dt>Distanz</dt><dd id="garmin-total-distance">–</dd></div><div><dt>Laufzeit</dt><dd id="garmin-total-duration">–</dd></div><div><dt>Ø Pace</dt><dd id="garmin-total-pace">–</dd></div></dl>
+        <p id="garmin-updated" class="planner-note"></p>
+        <ul id="garmin-runs" class="garmin-runs"></ul>
+        <p id="garmin-empty" class="planner-note">Verbinde Garmin, um deine Laufdaten zu laden.</p>
+        <p class="planner-note">Datenquelle: Garmin. Garmin-Läufe werden separat von deinen manuellen Aktivitäten angezeigt.</p>
+      </section>
       <section class="card library-panel">
         <div class="section-heading"><span class="eyebrow">In Bewegung bleiben</span><svg aria-hidden="true"><use href="#icon-cardio"/></svg></div>
         <h2>Jede Einheit zählt.</h2><p class="planner-note">Halte deine Ausdaueraktivitäten fest und sieh deine Woche wachsen.</p>
