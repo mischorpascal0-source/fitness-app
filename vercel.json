@@ -8,7 +8,7 @@
     "api/gateway.js": { "maxDuration": 30 }
   },
   "rewrites": [
-    { "source": "/api/:resource(session|register|login|logout|plans)", "destination": "/api/gateway?__fitness_route=/api/:resource" },
+    { "source": "/api/:resource(session|register|login|logout|plans|garmin)", "destination": "/api/gateway?__fitness_route=/api/:resource" },
     { "source": "/api/plans/:id", "destination": "/api/gateway?__fitness_route=/api/plans/:id" },
     { "source": "/auth/confirm", "destination": "/api/gateway?__fitness_route=/auth/confirm" }
   ]

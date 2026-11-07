@@ -125,6 +125,9 @@ async function routeAccountRequest(request, response, pathname, origin, handleAc
     }
   }
   try {
+    if (pathname === "/api/garmin") {
+      return await require("./cardio-garmin.cjs")(request, response, origin, handleAccounts);
+    }
     return await handleAccounts(request, response, pathname, sendJson, origin);
   } catch (error) {
     console.error("Fehler bei einer API-Anfrage.", error.code ?? error.name);
