@@ -2,10 +2,11 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const handleGarmin = require("./cardio-garmin.cjs");
 const { routeAccountRequest } = require("./account-http.cjs");
+process.env.FITNESS_GARMIN_COOKIE_KEY = "ab".repeat(32);
 const account = async (_req, res, _path, json) => json(res, 200, { user: { id: "account-a" } });
 const request = (body = { apiKey: "personal-key" }) => ({ method: "POST", headers: { "x-fitness-account": "account-a", "content-type": "application/json" }, body });
 function response() {
-  return { writeHead(status, headers) { this.status = status; this.headers = headers; }, end(body) { this.body = JSON.parse(body); } };
+  return { cookies: {}, setHeader(name, value) { this.cookies[name] = value; }, getHeader(name) { return this.cookies[name]; }, writeHead(status, headers) { this.status = status; this.headers = headers; }, end(body) { this.body = JSON.parse(body); } };
 }
 const run = { activityId: 123, activityName: "Morgenlauf", startTimeLocal: "2026-11-07 08:30:00", distance: 5000, duration: 1500, averageHR: 145, calories: 350 };
 
@@ -13,7 +14,7 @@ test("fetches only running activities with server-side credentials and normalize
   const calls = [];
   const fetcher = async (url, options) => {
     calls.push({ url, options });
-    return { ok: true, json: async () => calls.length === 1 ? { access_token: "token.test" } : [run, run, { activityId: 999 }] };
+    return { ok: true, text: async () => "  token.test\n", json: async () => [run, run, { activityId: 999 }] };
   };
   const res = response();
   await handleGarmin(request(), res, "http://localhost:3000", account, fetcher);
@@ -26,6 +27,7 @@ test("fetches only running activities with server-side credentials and normalize
   assert.equal(res.body.runs[0].start, "2026-11-07T08:30:00");
   assert.match(calls[1].url, /activityType=running/);
   assert.equal(calls[0].options.headers.Authorization, "ApiKey personal-key");
+  assert.equal(calls[0].options.headers.Accept, "*/*");
   assert.equal(calls[1].options.headers.Authorization, "Bearer token.test");
   assert.equal(calls[0].options.redirect, "error");
   assert.doesNotMatch(JSON.stringify(res.body), /personal-key|token.test/);
@@ -35,7 +37,7 @@ test("requires an authenticated app account and rejects account switches before 
   for (const [handler, req, expected] of [
     [async (_req, res, _path, json) => json(res, 200, { user: null }), request(), 401],
     [account, { ...request(), headers: { "x-fitness-account": "account-b" } }, 409],
-    [account, { ...request(), method: "GET" }, 405],
+    [account, { ...request(), method: "PUT" }, 405],
     [account, request({ apiKey: "bad\r\nheader" }), 400],
   ]) {
     const res = response();
@@ -122,14 +124,14 @@ test("Cardio UI calculates pace, keeps keys out of storage, resets account state
   ui.app.setAccount("account-a");
   assert.equal(ui.nodes["#garmin-total-runs"].textContent, "1");
   assert.equal(ui.nodes["#garmin-sync"].hidden, true);
-  ui.nodes["#garmin-disconnect"].events.click();
+  await ui.nodes["#garmin-disconnect"].events.click();
   assert.equal(ui.nodes["#garmin-total-runs"].textContent, "0");
   assert.equal(ui.storage.size, 0);
 });
 
 test("a late Garmin response after account switching cannot leak data into the new account", async () => {
   let finish;
-  const ui = browserHarness(() => new Promise((resolve) => { finish = resolve; }));
+  const ui = browserHarness((_url, options) => options.method === "POST" ? new Promise((resolve) => { finish = resolve; }) : Promise.resolve({ ok: true, json: async () => ({ connected: false }) }));
   ui.app.setAccount("account-a");
   ui.submit("private-key");
   ui.app.setAccount("account-b");
@@ -138,4 +140,45 @@ test("a late Garmin response after account switching cannot leak data into the n
   assert.equal(ui.nodes["#garmin-total-runs"].textContent, "0");
   assert.equal(ui.nodes["#garmin-sync"].hidden, true);
   assert.equal(ui.storage.size, 0);
+});
+
+test("saved keys survive a new request, stay HttpOnly/encrypted, and cannot cross accounts or be tampered with", async () => {
+  const keys = require("./cardio-garmin-key.cjs");
+  const res = response();
+  res.setHeader("Set-Cookie", ["existing-session=preserved"]);
+  keys.save(res, "https://fitness.example", "account-a", "secret-garmin-key");
+  const cookie = res.cookies["Set-Cookie"][1];
+  assert.match(cookie, /HttpOnly; SameSite=Strict; Max-Age=31536000; Secure/);
+  assert.doesNotMatch(cookie, /secret-garmin-key/);
+  assert.equal(res.cookies["Set-Cookie"][0], "existing-session=preserved");
+  const req = { ...request({}), headers: { ...request().headers, cookie: cookie.split(";")[0] } };
+  assert.equal(keys.read(req, "account-a"), "secret-garmin-key");
+  assert.equal(keys.read(req, "account-b"), null);
+  const bad = { ...req, headers: { ...req.headers, cookie: req.headers.cookie.slice(0, -5) + "AAAAA" } };
+  assert.equal(keys.read(bad, "account-a"), null);
+  const status = response();
+  await handleGarmin({ ...req, method: "GET" }, status, "https://fitness.example", account);
+  assert.deepEqual(status.body, { connected: true });
+  const calls = [];
+  const refreshed = response();
+  await handleGarmin(req, refreshed, "https://fitness.example", account, async (url, options) => {
+    calls.push(options);
+    return { ok: true, text: async () => "raw.jwt.token", json: async () => [] };
+  });
+  assert.equal(refreshed.status, 200);
+  assert.equal(calls[0].headers.Authorization, "ApiKey secret-garmin-key");
+  const deleted = response();
+  await handleGarmin({ ...req, body: { action: "disconnect" } }, deleted, "https://fitness.example", account);
+  assert.match(deleted.cookies["Set-Cookie"][0], /Max-Age=0/);
+  assert.equal(keys.read({ headers: { cookie: deleted.cookies["Set-Cookie"][0].split(";")[0] } }, "account-a"), null);
+});
+
+test("Cardio restores a saved connection after a new login without exposing the key to JavaScript", async () => {
+  const ui = browserHarness(async () => ({ ok: true, json: async () => ({ connected: true }) }));
+  ui.app.setAccount("account-a");
+  await tick();
+  assert.equal(ui.nodes["#garmin-sync"].hidden, false);
+  assert.equal(ui.nodes["#garmin-setup"].open, false);
+  assert.equal(ui.nodes["#garmin-key"].value, "");
+  assert.match(ui.nodes["#garmin-state"].textContent, /gespeichert/);
 });
