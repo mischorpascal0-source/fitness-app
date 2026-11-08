@@ -7,7 +7,7 @@ const cardioGarmin = (() => {
   const number = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 });
   const dateFormat = new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short" });
   let accountId = null;
-  let apiKey = "";
+  let connected = false;
   let saved = { runs: [], syncedAt: null };
   let controller = null;
   let revision = 0;
@@ -57,11 +57,12 @@ const cardioGarmin = (() => {
     const busy = Boolean(controller);
     form.querySelector("button").disabled = busy || !accountId;
     keyInput.disabled = busy || !accountId;
-    find("sync").hidden = !apiKey;
+    find("sync").hidden = !connected;
     find("sync").disabled = busy;
-    find("disconnect").hidden = !apiKey && !saved.syncedAt;
-    find("state").textContent = apiKey ? "Verbunden · Schlüssel gespeichert" : saved.syncedAt ? "Gespeicherte Laufdaten" : "Nicht verbunden";
-    find("state").dataset.connected = String(Boolean(apiKey));
+    find("disconnect").hidden = !connected && !saved.syncedAt;
+    find("disconnect").disabled = busy;
+    find("state").textContent = connected ? "Verbunden · Im Konto gespeichert" : saved.syncedAt ? "Gespeicherte Laufdaten" : "Nicht verbunden";
+    find("state").dataset.connected = String(connected);
     const period = find("period").value;
     const cutoff = new Date();
     cutoff.setHours(0, 0, 0, 0);
@@ -77,7 +78,9 @@ const cardioGarmin = (() => {
     find("total-pace").textContent = pace(timed.reduce((sum, run) => sum + run.duration, 0), timed.reduce((sum, run) => sum + run.distance, 0));
     find("runs").replaceChildren(...runs.map(runCard));
     find("empty").hidden = runs.length > 0;
-    find("empty").textContent = saved.syncedAt ? "Keine Garmin-Läufe in diesem Zeitraum. Wähle einen anderen Zeitraum oder synchronisiere erneut." : "Verbinde Garmin, um deine Laufdaten zu laden.";
+    find("empty").textContent = saved.syncedAt ? "Keine Garmin-Läufe in diesem Zeitraum. Wähle einen anderen Zeitraum oder synchronisiere erneut."
+      : connected ? "Deine Garmin-Verbindung ist im Konto verfügbar. Tippe auf „Jetzt synchronisieren“, um deine Läufe auf dieses Gerät zu laden."
+        : "Verbinde Garmin, um deine Laufdaten zu laden.";
     find("updated").textContent = saved.syncedAt ? "Zuletzt geladen: " + dateFormat.format(new Date(saved.syncedAt)) + " · Bis zu 100 letzte Läufe · Auf diesem Gerät gespeichert" : "";
     root.setAttribute("aria-busy", String(busy));
   }
@@ -98,13 +101,13 @@ const cardioGarmin = (() => {
       const result = await response.json().catch(() => null);
       if (currentRevision !== revision) return;
       if (!response.ok) {
-        if (result?.connected === true) apiKey = true;
-        if (response.status === 422) { apiKey = ""; find("setup").open = true; }
+        if (typeof result?.connected === "boolean") connected = result.connected;
+        if (response.status === 422 || !connected) find("setup").open = true;
         throw new Error(result?.error ?? "Garmin konnte nicht verbunden werden.");
       }
       if (!Array.isArray(result?.runs) || !Number.isFinite(Date.parse(result.syncedAt))) throw new Error("Ungültige Antwort beim Laden der Laufdaten.");
       saved = { runs: result.runs, syncedAt: result.syncedAt };
-      apiKey = true;
+      connected = true;
       keyInput.value = "";
       find("setup").open = false;
       status.textContent = `${saved.runs.length} Läufe geladen. Deine Laufdaten sind aktuell.`;
@@ -128,20 +131,26 @@ const cardioGarmin = (() => {
   find("sync").addEventListener("click", () => sync());
   find("period").addEventListener("change", render);
   find("disconnect").addEventListener("click", async () => {
+    if (controller || !accountId) return;
     const account = accountId;
     const version = revision;
+    controller = new AbortController();
+    render();
     try {
-      const response = await fetch("/api/garmin", { method: "POST", headers: { "Content-Type": "application/json", "X-Fitness-Account": account }, body: JSON.stringify({ action: "disconnect" }), signal: AbortSignal.timeout(25000) });
+      const response = await fetch("/api/garmin", { method: "POST", headers: { "Content-Type": "application/json", "X-Fitness-Account": account }, body: JSON.stringify({ action: "disconnect" }), signal: AbortSignal.any([controller.signal, AbortSignal.timeout(25000)]) });
       if (version !== revision) return;
       if (!response.ok) throw new Error("Der gespeicherte Garmin-Schlüssel konnte nicht entfernt werden. Versuche es erneut.");
-    } catch (error) { if (version === revision) status.textContent = error.message; return; }
+    } catch (error) {
+      if (version === revision) { controller = null; status.textContent = error.message; render(); }
+      return;
+    }
     revision++;
     controller?.abort();
     controller = null;
-    apiKey = "";
+    connected = false;
     keyInput.value = "";
     saved = { runs: [], syncedAt: null };
-    try { localStorage.removeItem(cacheKey()); status.textContent = "Verbindung getrennt und gespeicherte Garmin-Laufdaten entfernt."; }
+    try { localStorage.removeItem(cacheKey()); status.textContent = "Garmin vom Konto getrennt. Der Schlüssel wurde für alle Geräte entfernt und die Laufdaten auf diesem Gerät gelöscht."; }
     catch { status.textContent = "Verbindung getrennt. Gespeicherte Laufdaten konnten nicht entfernt werden. Lösche sie über die Browser-Einstellungen."; }
     find("setup").open = true;
     render();
@@ -152,7 +161,7 @@ const cardioGarmin = (() => {
       controller?.abort();
       controller = null;
       accountId = id ?? null;
-      apiKey = "";
+      connected = false;
       keyInput.value = "";
       saved = { runs: [], syncedAt: null };
       if (accountId) {
@@ -170,10 +179,14 @@ const cardioGarmin = (() => {
       render();
       if (accountId) {
         const version = revision;
-        fetch("/api/garmin", { headers: { "X-Fitness-Account": accountId }, signal: AbortSignal.timeout(25000) })
+        controller = new AbortController();
+        status.textContent = "Gespeicherte Garmin-Verbindung wird aus deinem Konto geladen …";
+        render();
+        fetch("/api/garmin", { headers: { "X-Fitness-Account": accountId }, signal: AbortSignal.any([controller.signal, AbortSignal.timeout(25000)]) })
           .then((response) => { if (!response.ok) throw new Error("Die gespeicherte Garmin-Verbindung konnte nicht geprüft werden."); return response.json(); })
-          .then((result) => { if (version === revision) { apiKey = result.connected === true; find("setup").open = !apiKey; render(); } })
-          .catch((error) => { if (version === revision) status.textContent = error.message; });
+          .then((result) => { if (version === revision) { connected = result.connected === true; find("setup").open = !connected; status.textContent = ""; } })
+          .catch((error) => { if (version === revision) status.textContent = error.message; })
+          .finally(() => { if (version === revision) { controller = null; render(); } });
       }
     },
   };

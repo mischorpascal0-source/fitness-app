@@ -44,6 +44,11 @@ db.exec(`
     updated_at INTEGER NOT NULL
   ) STRICT;
   CREATE INDEX IF NOT EXISTS plans_by_account ON plans(account_id, updated_at);
+  CREATE TABLE IF NOT EXISTS garmin_connections (
+    account_id TEXT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
+    encrypted_key TEXT,
+    revision INTEGER NOT NULL DEFAULT 1
+  ) STRICT;
 `);
 
 const statements = {
@@ -214,4 +219,10 @@ async function handleAccounts(request, response, pathname, sendJson) {
   return sendJson(response, 405, { error: "Diese Anfrage wird nicht unterstützt." });
 }
 
+handleAccounts.resolveSession = async (request) => {
+  const token = readToken(request);
+  const account = token && statements.getSession.get(hashToken(token), Date.now());
+  if (!account) return null;
+  return { user: publicAccount(account), garmin: require("./cardio-garmin-store.cjs").createSqliteStore(db, account.id) };
+};
 module.exports = handleAccounts;

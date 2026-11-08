@@ -5,7 +5,7 @@ let localSecret;
 function secret() {
   const configured = process.env.FITNESS_GARMIN_COOKIE_KEY;
   if (configured && /^[a-f0-9]{64}$/i.test(configured)) return Buffer.from(configured, "hex");
-  if (process.env.VERCEL) throw new Error("Garmin-Schlüsselspeicherung ist auf dem Server noch nicht eingerichtet.");
+  if (process.env.VERCEL) throw Object.assign(new Error("Die Garmin-Schlüsselspeicherung ist gerade nicht verfügbar."), { status: 503 });
   if (!localSecret) {
     const directory = join(__dirname, ".data");
     const filename = join(directory, "garmin-cookie.key");
@@ -18,6 +18,26 @@ function secret() {
   return localSecret;
 }
 const cookieName = (account) => "fitness_garmin_" + createHash("sha256").update(account).digest("hex").slice(0, 20);
+function seal(account, apiKey) {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", secret(), iv);
+  cipher.setAAD(Buffer.from(account));
+  const encrypted = Buffer.concat([cipher.update(JSON.stringify({ apiKey })), cipher.final()]);
+  return "v1." + Buffer.concat([iv, cipher.getAuthTag(), encrypted]).toString("base64url");
+}
+function open(account, value) {
+  if (!value) return null;
+  const encryptionKey = secret();
+  try {
+    if (!/^v1\.[A-Za-z0-9_-]{32,4093}$/.test(value)) return null;
+    const data = Buffer.from(value.slice(3), "base64url");
+    const decipher = createDecipheriv("aes-256-gcm", encryptionKey, data.subarray(0, 12));
+    decipher.setAAD(Buffer.from(account));
+    decipher.setAuthTag(data.subarray(12, 28));
+    const result = JSON.parse(Buffer.concat([decipher.update(data.subarray(28)), decipher.final()]).toString());
+    return typeof result.apiKey === "string" && result.apiKey.length > 0 && result.apiKey.length <= 2048 && !/[\s\p{Cc}]/u.test(result.apiKey) ? result.apiKey : null;
+  } catch { return null; }
+}
 function save(response, origin, account, apiKey) {
   let value = "";
   if (apiKey) {
@@ -44,4 +64,4 @@ function read(request, account) {
     return typeof result.apiKey === "string" && result.expires > Date.now() ? result.apiKey : null;
   } catch { return null; }
 }
-module.exports = { save, read };
+module.exports = { seal, open, save, read };

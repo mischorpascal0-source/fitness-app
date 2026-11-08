@@ -1,4 +1,4 @@
-// Official Garmin Connect Personal API. Keys live in account-bound encrypted HttpOnly cookies.
+// Official Garmin Connect Personal API. Encrypted keys belong to the signed-in app account.
 const { readJson, sendJson } = require("./account-http.cjs");
 const keyStore = require("./cardio-garmin-key.cjs");
 const base = "https://personal.connectapi.garmin.com";
@@ -34,6 +34,7 @@ async function garminCall(path, headers, method, fetcher) {
       : response.status === 429 ? "Garmin erhält zu viele Anfragen. Versuche es in ein paar Minuten erneut."
         : `Garmin-Anfrage fehlgeschlagen (${stage}, HTTP ${response.status}). Versuche es später erneut.`);
     error.status = response.status === 429 ? 429 : rejected ? 422 : 502;
+    error.garminAuthentication = method === "POST";
     throw error;
   }
   return method === "POST" ? (await response.text()).trim() : response.json();
@@ -41,42 +42,75 @@ async function garminCall(path, headers, method, fetcher) {
 
 async function handleGarmin(request, response, origin, handleAccounts, fetcher = fetch) {
   if (!["GET", "POST"].includes(request.method)) return sendJson(response, 405, { error: "Verwende die Synchronisierung im Cardio-Bereich." });
-  // Reuse existing local/Supabase session validation, including refreshed session cookies.
-  let session;
-  let sessionStatus;
-  await handleAccounts({ headers: request.headers, method: "GET" }, response, "/api/session", (_res, status, data) => {
-    sessionStatus = status;
-    session = data;
-  }, origin);
-  if (sessionStatus !== 200 || !session?.user) return sendJson(response, 401, { error: "Melde dich erneut in der Fitness-App an." });
-  if (request.headers["x-fitness-account"] !== session.user.id) {
-    return sendJson(response, 409, { error: "Das aktive Konto hat sich geändert. Lade die Seite neu." });
-  }
-  const storedKey = keyStore.read(request, session.user.id);
-  if (request.method === "GET") return sendJson(response, 200, { connected: Boolean(storedKey) });
-  const body = await readJson(request);
-  if (body?.action === "disconnect") {
-    keyStore.save(response, origin, session.user.id, null);
-    return sendJson(response, 200, { connected: false });
-  }
-  const key = typeof body?.apiKey === "string" ? body.apiKey.trim() : storedKey;
-  if (!key || key.length > 2048 || /[\s\p{Cc}]/u.test(key)) {
-    return sendJson(response, 400, { error: "Gib einen gültigen persönlichen Garmin API-Schlüssel ein." });
-  }
-  let keySaved = Boolean(storedKey);
+  let connection;
+  let record;
+  let storedKey;
+  let suppliedKey = false;
+  let usingStoredKey = false;
+  let connected = false;
   try {
+    // Session tokens and storage adapters remain server-side, including after token refresh.
+    const session = await handleAccounts.resolveSession(request, response, origin);
+    if (!session?.user) return sendJson(response, 401, { error: "Melde dich erneut in der Fitness-App an." });
+    const accountId = session.user.id;
+    if (request.headers["x-fitness-account"] !== accountId) {
+      return sendJson(response, 409, { error: "Das aktive Konto hat sich geändert. Lade die Seite neu." });
+    }
+    connection = session.garmin;
+    record = await connection.get();
+    const body = request.method === "POST" ? await readJson(request) : null;
+    if (body?.action === "disconnect") {
+      // Keep an empty record to prevent old device cookies from restoring a removed key.
+      await connection.write(null, record?.revision ?? null);
+      keyStore.save(response, origin, accountId, null);
+      return sendJson(response, 200, { connected: false });
+    }
+    if (!record) {
+      const legacyKey = keyStore.read(request, accountId);
+      if (legacyKey) {
+        try { record = await connection.write(keyStore.seal(accountId, legacyKey), null); }
+        catch (error) {
+          if (error.status !== 409) throw error;
+          record = await connection.get();
+        }
+      }
+    }
+    if (record) keyStore.save(response, origin, accountId, null);
+    storedKey = keyStore.open(accountId, record?.encryptedKey);
+    connected = Boolean(storedKey);
+    if (request.method === "GET") return sendJson(response, 200, { connected });
+    suppliedKey = typeof body?.apiKey === "string";
+    const key = suppliedKey ? body.apiKey.trim() : storedKey;
+    usingStoredKey = Boolean(storedKey && key === storedKey);
+    if (!key && !suppliedKey) {
+      return sendJson(response, 409, { connected: false, error: "Deine Garmin-Verbindung ist nicht mehr im Konto gespeichert. Verbinde Garmin erneut." });
+    }
+    if (!key || key.length > 2048 || /[\s\p{Cc}]/u.test(key)) {
+      return sendJson(response, 400, { connected, error: "Gib einen gültigen persönlichen Garmin API-Schlüssel ein." });
+    }
     const token = await garminCall("/personalapitoken-service/personal-api/personal-api-key/token", { Authorization: "ApiKey " + key }, "POST", fetcher);
     const accessToken = token;
     if (typeof accessToken !== "string" || !/^[A-Za-z0-9._~-]+$/.test(accessToken)) throw new Error("Invalid token");
-    keyStore.save(response, origin, session.user.id, key);
-    keySaved = true;
+    if (key !== storedKey) {
+      record = await connection.write(keyStore.seal(accountId, key), record?.revision ?? null);
+      connected = true;
+      keyStore.save(response, origin, accountId, null);
+    }
     const activities = await garminCall("/activitylist-service/activities/search/activities?activityType=running&start=0&limit=100&sortOrder=desc", { Authorization: "Bearer " + accessToken }, "GET", fetcher);
     if (!Array.isArray(activities)) throw new Error("Invalid activities");
+    const latest = await connection.get();
+    if (latest?.revision !== record.revision) {
+      return sendJson(response, 409, { connected: false, error: "Die Garmin-Verbindung wurde auf einem anderen Gerät geändert. Lade die Seite neu." });
+    }
     const runs = [...new Map(activities.map(normalizeRun).filter(Boolean).map((run) => [run.id, run])).values()];
     return sendJson(response, 200, { runs, syncedAt: new Date().toISOString(), limit: 100, connected: true });
   } catch (error) {
-    if (error.status === 422) { keyStore.save(response, origin, session.user.id, null); keySaved = false; }
-    return sendJson(response, error.status ?? 502, { connected: keySaved, error: error.status ? error.message : "Die Garmin-Laufdaten konnten nicht geladen werden. Versuche es erneut." });
+    // An invalid replacement must not remove a previously valid account connection.
+    if (error.status === 422 && error.garminAuthentication && usingStoredKey) {
+      try { await connection.write(null, record.revision); connected = false; }
+      catch (storageError) { error = storageError; connected = false; }
+    }
+    return sendJson(response, error.status ?? 502, { connected, error: error.status ? error.message : "Die Garmin-Laufdaten konnten nicht geladen werden. Versuche es erneut." });
   }
 }
 

@@ -1,9 +1,16 @@
-const { test } = require("node:test");
+const { test, beforeEach } = require("node:test");
 const assert = require("node:assert/strict");
+const { DatabaseSync } = require("node:sqlite");
 const handleGarmin = require("./cardio-garmin.cjs");
 const { routeAccountRequest } = require("./account-http.cjs");
+const { createSqliteStore } = require("./cardio-garmin-store.cjs");
+const keys = require("./cardio-garmin-key.cjs");
 process.env.FITNESS_GARMIN_COOKIE_KEY = "ab".repeat(32);
+const db = new DatabaseSync(":memory:");
+db.exec("CREATE TABLE garmin_connections (account_id TEXT PRIMARY KEY, encrypted_key TEXT, revision INTEGER NOT NULL DEFAULT 1)");
+beforeEach(() => db.exec("DELETE FROM garmin_connections"));
 const account = async (_req, res, _path, json) => json(res, 200, { user: { id: "account-a" } });
+account.resolveSession = async () => ({ user: { id: "account-a" }, garmin: createSqliteStore(db, "account-a") });
 const request = (body = { apiKey: "personal-key" }) => ({ method: "POST", headers: { "x-fitness-account": "account-a", "content-type": "application/json" }, body });
 function response() {
   return { cookies: {}, setHeader(name, value) { this.cookies[name] = value; }, getHeader(name) { return this.cookies[name]; }, writeHead(status, headers) { this.status = status; this.headers = headers; }, end(body) { this.body = JSON.parse(body); } };
@@ -35,7 +42,7 @@ test("fetches only running activities with server-side credentials and normalize
 
 test("requires an authenticated app account and rejects account switches before calling Garmin", async () => {
   for (const [handler, req, expected] of [
-    [async (_req, res, _path, json) => json(res, 200, { user: null }), request(), 401],
+    [{ resolveSession: async () => null }, request(), 401],
     [account, { ...request(), headers: { "x-fitness-account": "account-b" } }, 409],
     [account, { ...request(), method: "PUT" }, 405],
     [account, request({ apiKey: "bad\r\nheader" }), 400],
@@ -111,6 +118,7 @@ test("Cardio UI calculates pace, keeps keys out of storage, resets account state
   const normalized = handleGarmin.normalizeRun(run);
   const ui = browserHarness(async () => ({ ok: true, json: async () => ({ runs: [normalized], syncedAt: new Date().toISOString() }) }));
   ui.app.setAccount("account-a");
+  await tick();
   ui.submit("private-personal-key");
   await tick();
   assert.equal(ui.nodes["#garmin-total-pace"].textContent, "5:00 /km");
@@ -124,6 +132,7 @@ test("Cardio UI calculates pace, keeps keys out of storage, resets account state
   ui.app.setAccount("account-a");
   assert.equal(ui.nodes["#garmin-total-runs"].textContent, "1");
   assert.equal(ui.nodes["#garmin-sync"].hidden, true);
+  await tick();
   await ui.nodes["#garmin-disconnect"].events.click();
   assert.equal(ui.nodes["#garmin-total-runs"].textContent, "0");
   assert.equal(ui.storage.size, 0);
@@ -133,6 +142,7 @@ test("a late Garmin response after account switching cannot leak data into the n
   let finish;
   const ui = browserHarness((_url, options) => options.method === "POST" ? new Promise((resolve) => { finish = resolve; }) : Promise.resolve({ ok: true, json: async () => ({ connected: false }) }));
   ui.app.setAccount("account-a");
+  await tick();
   ui.submit("private-key");
   ui.app.setAccount("account-b");
   finish({ ok: true, json: async () => ({ runs: [handleGarmin.normalizeRun(run)], syncedAt: new Date().toISOString() }) });
@@ -142,8 +152,7 @@ test("a late Garmin response after account switching cannot leak data into the n
   assert.equal(ui.storage.size, 0);
 });
 
-test("saved keys survive a new request, stay HttpOnly/encrypted, and cannot cross accounts or be tampered with", async () => {
-  const keys = require("./cardio-garmin-key.cjs");
+test("legacy browser keys migrate into the account and old cookies cannot undo a disconnect", async () => {
   const res = response();
   res.setHeader("Set-Cookie", ["existing-session=preserved"]);
   keys.save(res, "https://fitness.example", "account-a", "secret-garmin-key");
@@ -159,6 +168,10 @@ test("saved keys survive a new request, stay HttpOnly/encrypted, and cannot cros
   const status = response();
   await handleGarmin({ ...req, method: "GET" }, status, "https://fitness.example", account);
   assert.deepEqual(status.body, { connected: true });
+  const stored = await createSqliteStore(db, "account-a").get();
+  assert.equal(keys.open("account-a", stored.encryptedKey), "secret-garmin-key");
+  assert.doesNotMatch(stored.encryptedKey, /secret-garmin-key/);
+  assert.match(status.cookies["Set-Cookie"][0], /Max-Age=0/);
   const calls = [];
   const refreshed = response();
   await handleGarmin(req, refreshed, "https://fitness.example", account, async (url, options) => {
@@ -171,6 +184,10 @@ test("saved keys survive a new request, stay HttpOnly/encrypted, and cannot cros
   await handleGarmin({ ...req, body: { action: "disconnect" } }, deleted, "https://fitness.example", account);
   assert.match(deleted.cookies["Set-Cookie"][0], /Max-Age=0/);
   assert.equal(keys.read({ headers: { cookie: deleted.cookies["Set-Cookie"][0].split(";")[0] } }, "account-a"), null);
+  const oldDevice = response();
+  await handleGarmin({ ...req, method: "GET" }, oldDevice, "https://fitness.example", account);
+  assert.deepEqual(oldDevice.body, { connected: false });
+  assert.equal((await createSqliteStore(db, "account-a").get()).encryptedKey, null);
 });
 
 test("Cardio restores a saved connection after a new login without exposing the key to JavaScript", async () => {
@@ -180,5 +197,96 @@ test("Cardio restores a saved connection after a new login without exposing the 
   assert.equal(ui.nodes["#garmin-sync"].hidden, false);
   assert.equal(ui.nodes["#garmin-setup"].open, false);
   assert.equal(ui.nodes["#garmin-key"].value, "");
-  assert.match(ui.nodes["#garmin-state"].textContent, /gespeichert/);
+  assert.match(ui.nodes["#garmin-state"].textContent, /Im Konto gespeichert/);
+  assert.match(ui.nodes["#garmin-empty"].textContent, /Jetzt synchronisieren/);
+});
+
+const garminSuccess = async () => ({ ok: true, text: async () => "raw.jwt.token", json: async () => [run] });
+test("a saved key is available on another device without any Garmin cookie and remains private to its owner", async () => {
+  const firstDevice = response();
+  await handleGarmin(request({ apiKey: "account-personal-key" }), firstDevice, "https://fitness.example", account, garminSuccess);
+  assert.equal(firstDevice.status, 200);
+  const stored = await createSqliteStore(db, "account-a").get();
+  assert.equal(keys.open("account-a", stored.encryptedKey), "account-personal-key");
+  assert.equal(keys.open("account-b", stored.encryptedKey), null);
+  const secondDevice = response();
+  await handleGarmin({ ...request(), method: "GET" }, secondDevice, "https://fitness.example", account);
+  assert.deepEqual(secondDevice.body, { connected: true });
+  const calls = [];
+  const sync = response();
+  await handleGarmin(request({}), sync, "https://fitness.example", account, async (_url, options) => { calls.push(options); return garminSuccess(); });
+  assert.equal(sync.status, 200);
+  assert.equal(calls[0].headers.Authorization, "ApiKey account-personal-key");
+  const other = { resolveSession: async () => ({ user: { id: "account-b" }, garmin: createSqliteStore(db, "account-b") }) };
+  const otherDevice = response();
+  await handleGarmin({ ...request(), method: "GET", headers: { "x-fitness-account": "account-b" } }, otherDevice, "https://fitness.example", other);
+  assert.deepEqual(otherDevice.body, { connected: false });
+  for (const res of [firstDevice, secondDevice, sync, otherDevice]) {
+    assert.doesNotMatch(JSON.stringify(res.body) + JSON.stringify(res.cookies), /account-personal-key|raw.jwt.token|v1\./);
+  }
+});
+
+test("invalid replacement and transient Garmin failures preserve the saved account key", async () => {
+  const store = createSqliteStore(db, "account-a");
+  await store.write(keys.seal("account-a", "still-valid-key"), null);
+  const original = await store.get();
+  const rejected = response();
+  await handleGarmin(request({ apiKey: "wrong-replacement" }), rejected, "https://fitness.example", account, async () => ({ ok: false, status: 401 }));
+  assert.equal(rejected.status, 422);
+  assert.equal(rejected.body.connected, true);
+  assert.deepEqual(await store.get(), original);
+  for (const status of [429, 503]) {
+    const res = response();
+    await handleGarmin(request({}), res, "https://fitness.example", account, async () => ({ ok: false, status }));
+    assert.equal(res.body.connected, true);
+    assert.deepEqual(await store.get(), original);
+  }
+  const expired = response();
+  await handleGarmin(request({}), expired, "https://fitness.example", account, async () => ({ ok: false, status: 401 }));
+  assert.equal(expired.body.connected, false);
+  assert.equal((await store.get()).encryptedKey, null);
+});
+
+test("disconnecting on one device prevents an in-flight sync on another device from restoring the connection", async () => {
+  const store = createSqliteStore(db, "account-a");
+  await store.write(keys.seal("account-a", "shared-key"), null);
+  let release;
+  const activities = new Promise(resolve => { release = resolve; });
+  let started;
+  const fetching = new Promise(resolve => { started = resolve; });
+  const res = response();
+  const syncing = handleGarmin(request({}), res, "https://fitness.example", account, async (_url, options) => {
+    if (options.method === "POST") return garminSuccess();
+    started(); return activities;
+  });
+  await fetching;
+  const disconnected = response();
+  await handleGarmin(request({ action: "disconnect" }), disconnected, "https://fitness.example", account);
+  release({ ok: true, json: async () => [run] });
+  await syncing;
+  assert.equal(disconnected.status, 200);
+  assert.equal(res.status, 409);
+  assert.equal(res.body.connected, false);
+  assert.equal((await store.get()).encryptedKey, null);
+});
+
+test("an account storage failure never reports a key as saved", async () => {
+  const broken = { resolveSession: async () => ({ user: { id: "account-a" }, garmin: {
+    get: async () => null, write: async () => { throw Object.assign(new Error("Speicherung nicht verfügbar."), { status: 503 }); },
+  } }) };
+  const res = response();
+  await handleGarmin(request(), res, "https://fitness.example", broken, garminSuccess);
+  assert.equal(res.status, 503);
+  assert.equal(res.body.connected, false);
+  assert.doesNotMatch(JSON.stringify(res.body), /personal-key/);
+});
+
+test("maximum supported key length fits the encrypted record and tampering cannot cross account boundaries", () => {
+  const key = "x".repeat(2048);
+  const encrypted = keys.seal("account-a", key);
+  assert.ok(encrypted.length <= 4096);
+  assert.equal(keys.open("account-a", encrypted), key);
+  assert.equal(keys.open("account-b", encrypted), null);
+  const tampered = encrypted.slice(0, -12) + "AAAAAAAAAAAA";
+  assert.equal(keys.open("account-a", tampered), null);
 });

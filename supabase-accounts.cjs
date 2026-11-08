@@ -171,7 +171,7 @@ function createSupabaseAccounts(baseUrl, publishableKey) {
 
   const record = ({ id, data, version }) => ({ id, plan: data, version });
 
-  return async function handle(request, response, pathname, sendJson, origin) {
+  async function handle(request, response, pathname, sendJson, origin) {
     const method = request.method;
     try {
       if (method === "POST" && ["/api/register", "/api/login"].includes(pathname)) {
@@ -235,7 +235,14 @@ function createSupabaseAccounts(baseUrl, publishableKey) {
       if (error instanceof CloudError) return sendJson(response, error.status, { error: error.message });
       throw error;
     }
+  }
+  // Server-only context; access tokens and the integration store never enter /api/session JSON.
+  handle.resolveSession = async (request, response, origin) => {
+    const session = await getSession(request, response, origin);
+    if (!session) return null;
+    return { user: session.user, garmin: require("./cardio-garmin-store.cjs").createSupabaseStore(call, session) };
   };
+  return handle;
 }
 
 module.exports = createSupabaseAccounts;
