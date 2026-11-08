@@ -70,13 +70,7 @@ const strengthDashboard = (() => {
     try {
       const stored = storageKey && JSON.parse(localStorage.getItem(storageKey));
       if (Array.isArray(stored?.workouts)) {
-        if (stored.active) {
-          stored.active.startedAt ??= Date.now();
-          for (const exercise of stored.active.exercises) {
-            exercise.weights ??= exercise.done.map(() => "");
-            exercise.setReps ??= exercise.done.map(() => exercise.reps);
-          }
-        }
+        stored.active = workoutState.normalize(stored.active);
         return stored;
       }
     } catch {
@@ -87,6 +81,16 @@ const strengthDashboard = (() => {
 
   function writeJournal(next, messageElement) {
     try {
+      if (!storageKey) return false;
+      // An old tab must not resurrect a workout completed/discarded in another tab.
+      const latest = readJournal();
+      if ((latest.active?.id ?? null) !== (journal?.active?.id ?? null)) {
+        journal = latest;
+        if (dialog.open) dialog.close();
+        render();
+        messageElement.textContent = "Die Einheit wurde in einem anderen Fenster geändert. Bitte öffne sie erneut.";
+        return false;
+      }
       localStorage.setItem(storageKey, JSON.stringify(next));
       journal = next;
       document.dispatchEvent(new Event("fitness:workoutchange"));
@@ -199,8 +203,8 @@ const strengthDashboard = (() => {
     document.querySelector("#strength-today").textContent = name;
     start.setAttribute("aria-label", name + (active ? " fortsetzen" : " starten") + ", " + fullDate.format(selectedDate));
     const actionLabel = active ? "Training fortsetzen" : "Training starten";
-    start.querySelector(".sr-only").textContent = actionLabel;
-    document.querySelector("#strength-start-hint").firstChild.textContent = actionLabel + " ";
+    start.textContent = actionLabel;
+    document.querySelector("#strength-session-date").textContent = fullDate.format(selectedDate);
     const sets = exercises.reduce((sum, entry) => sum + (entry.sets ?? entry.done.length), 0);
     facts.replaceChildren(...[
       ["#icon-clock", trainingPlanData.estimateMinutes(sets) + " Minuten"],
@@ -216,7 +220,7 @@ const strengthDashboard = (() => {
     muscles.textContent = [...new Set(exercises.flatMap((entry) => entry.muscles ?? primaryMuscles(catalog.get(entry.id))))].join(", ");
     muscles.title = muscles.textContent;
     muscles.hidden = !exercises.length;
-    preview.replaceChildren(...exercises.map((entry) => {
+    preview.replaceChildren(...exercises.slice(0, 3).map((entry) => {
       const exercise = catalog.get(entry.id);
       const row = document.createElement("li");
       const illustration = exercise && exerciseIllustrations.create(exercise);
@@ -233,7 +237,7 @@ const strengthDashboard = (() => {
       name.textContent = exercise?.name ?? entry.name;
       name.title = name.textContent;
       const detail = document.createElement("small");
-      detail.textContent = (entry.sets ?? entry.done.length) + " × " + entry.reps + " · " + (exercise?.type ?? "Eigene Übung");
+      detail.textContent = (entry.sets ?? entry.done.length) + " × " + entry.reps + " · " + (exercise?.type || entry.equipment || "Eigene Übung");
       copy.append(name, detail);
       row.append(copy);
       return row;
@@ -271,6 +275,8 @@ const strengthDashboard = (() => {
     activeWidget.hidden = !storageKey || !journal?.active;
     document.body.classList.toggle("has-active-workout", Boolean(storageKey && journal?.active));
     document.querySelector("#active-workout-name").textContent = journal?.active?.name ?? "";
+    activeWidget.querySelector("strong").textContent = journal?.active?.pausedAt != null ? "Training pausiert" : "Training läuft";
+    activeWidget.setAttribute("aria-label", "Training fortsetzen: " + (journal?.active?.name ?? "") + (journal?.active ? ", " + fullDate.format(new Date(journal.active.date + "T12:00:00")) : ""));
     if (!journal || (section.hidden && document.querySelector("#statistics-view").hidden)) return;
     const now = selectedDate;
     const today = dateKey(now);
@@ -322,170 +328,301 @@ const strengthDashboard = (() => {
     renderHistory();
   }
 
-  function updateWorkoutProgress() {
-    const done = journal.active.exercises.flatMap((exercise) => exercise.done);
-    const count = done.filter(Boolean).length;
-    workoutStatus.textContent = `${count} von ${done.length} Sätzen abgehakt.`;
-    finish.disabled = count === 0;
+  const exerciseStage = document.querySelector("#workout-exercise-stage");
+  const summaryStage = document.querySelector("#workout-summary");
+  const pauseButton = document.querySelector("#workout-pause");
+  const incomplete = document.querySelector("#workout-confirm-incomplete");
+  let accountEpoch = 0;
+  let finishing = false;
+
+  function saveActive(active) {
+    return writeJournal({ ...journal, active }, workoutStatus);
+  }
+
+  function formatDuration(milliseconds) {
+    const seconds = Math.floor(milliseconds / 1000);
+    return Math.floor(seconds / 60).toString().padStart(2, "0") + ":" + (seconds % 60).toString().padStart(2, "0");
+  }
+
+  function updateWorkoutProgress(announce = true) {
+    if (!journal.active) return;
+    const totals = workoutState.summary(journal.active);
+    document.querySelector("#workout-exercise-progress").textContent = `Übung ${journal.active.exerciseIndex + 1} von ${journal.active.exercises.length}`;
+    document.querySelector("#workout-set-progress").textContent = `${totals.totalSets} / ${totals.plannedSets} Sätze`;
+    const progress = document.querySelector("#workout-progress");
+    progress.max = totals.plannedSets;
+    progress.value = totals.totalSets;
+    if (announce) workoutStatus.textContent = `${totals.totalSets} von ${totals.plannedSets} Sätzen erledigt.`;
+    finish.disabled = finishing || !totals.totalSets || (totals.totalSets < totals.plannedSets && !incomplete.checked);
+    renderTimers();
+  }
+
+  function renderSummary() {
+    const active = journal.active;
+    const totals = workoutState.summary(active);
+    const list = document.querySelector("#workout-summary-totals");
+    list.replaceChildren(...[
+      ["Aktive Dauer", formatDuration(totals.durationMs)],
+      ["Übungen vollständig", `${totals.completedExercises} / ${active.exercises.length}`],
+      ["Sätze absolviert", `${totals.totalSets} / ${totals.plannedSets}`],
+    ].map(([label, value]) => {
+      const item = document.createElement("div");
+      const term = document.createElement("dt"); term.textContent = label;
+      const detail = document.createElement("dd"); detail.textContent = value;
+      item.append(term, detail);
+      return item;
+    }));
+    document.querySelector("#workout-summary-exercises").replaceChildren(...active.exercises.map((exercise, index) => {
+      const row = document.createElement("li");
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "workout-summary-exercise";
+      button.dataset.workoutExercise = index;
+      const name = document.createElement("strong"); name.textContent = exercise.name;
+      const detail = document.createElement("small");
+      detail.textContent = `${exercise.done.filter(Boolean).length} / ${exercise.done.length} Sätze` + (exercise.skipped ? " · Rest übersprungen" : "") + " · Bearbeiten ›";
+      button.append(name, detail);
+      button.addEventListener("click", () => navigateExercise(index));
+      row.append(button);
+      return row;
+    }));
+    const missing = totals.openSets + totals.skippedSets;
+    document.querySelector("#workout-unfinished").textContent = !totals.totalSets
+      ? "Noch kein Satz erledigt. Erfasse mindestens einen Satz, um diese Einheit zu speichern."
+      : missing ? `${totals.openSets} offene und ${totals.skippedSets} übersprungene Sätze. Nur die ${totals.totalSets} abgehakten Sätze werden in den Statistiken gezählt.`
+        : "Alle geplanten Sätze erledigt. Du kannst deine Einheit jetzt speichern.";
+    document.querySelector("#workout-confirm-label").hidden = !missing || !totals.totalSets;
+    incomplete.checked = false;
   }
 
   function renderWorkout() {
     const active = journal.active;
+    if (!active) return;
     workoutTitle.textContent = active.name;
     document.querySelector("#workout-scheduled-date").textContent = "Training für " + fullDate.format(new Date(active.date + "T12:00:00"));
-    workoutExercises.replaceChildren(...active.exercises.map((exercise, index) => {
-      const fieldset = document.createElement("fieldset");
-      fieldset.className = "workout-sets";
-      const legend = document.createElement("legend");
-      const illustration = exercise.id && exerciseIllustrations.create(catalog.get(exercise.id));
-      if (illustration) {
-        const image = document.createElement("span");
-        image.className = "exercise-preview";
-        image.setAttribute("aria-hidden", "true");
-        image.append(illustration);
-        legend.append(image);
-      }
-      legend.append(exercise.name);
-      const reps = document.createElement("p");
-      reps.className = "planner-note";
-      reps.textContent = `${exercise.reps} Wiederholungen pro Satz`;
-      const boxes = document.createElement("div");
-      boxes.className = "workout-set-grid";
-      const labels = document.createElement("div");
-      labels.className = "workout-set-labels";
-      for (const text of ["Satz", "kg", "Wdh.", "Fertig"]) {
-        const label = document.createElement("span");
-        label.textContent = text;
-        labels.append(label);
-      }
-      boxes.append(labels);
-      exercise.done.forEach((checked, set) => {
-        const row = document.createElement("div");
-        row.className = "workout-set-row";
-        const number = document.createElement("span");
-        number.textContent = set + 1;
-        row.append(number);
-        for (const [field, label, min, max, step, value] of [
-          ["weights", "Gewicht in kg", 0, 2000, ".5", exercise.weights[set]],
-          ["setReps", "Wiederholungen", 1, 1000, "1", exercise.setReps[set]],
-        ]) {
-          const input = document.createElement("input");
-          input.type = "number";
-          input.inputMode = "decimal";
-          input.min = min;
-          input.max = max;
-          input.step = step;
-          input.required = field === "setReps";
-          input.value = value;
-          input.setAttribute("aria-label", label + ", Satz " + (set + 1) + ", " + exercise.name);
-          input.addEventListener("change", () => {
-            if (!input.reportValidity()) return;
-            const active = structuredClone(journal.active);
-            active.exercises[index][field][set] = input.value === "" ? "" : input.valueAsNumber;
-            if (!writeJournal({ ...journal, active }, workoutStatus)) input.value = journal.active.exercises[index][field][set];
-          });
-          row.append(input);
-        }
-        const box = document.createElement("input");
-        box.type = "checkbox";
-        box.checked = checked;
-        box.setAttribute("aria-label", "Satz " + (set + 1) + " für " + exercise.name + " abgeschlossen");
-        box.addEventListener("change", () => {
-          if ([...row.querySelectorAll('input[type="number"]')].some((input) => !input.reportValidity())) {
-            box.checked = journal.active.exercises[index].done[set];
-            return;
+    const reviewing = active.stage === "summary";
+    exerciseStage.hidden = reviewing;
+    summaryStage.hidden = !reviewing;
+    pauseButton.hidden = reviewing;
+    pauseButton.textContent = active.pausedAt != null ? "Fortsetzen" : "Pausieren";
+    pauseButton.setAttribute("aria-pressed", String(active.pausedAt != null));
+    document.querySelector("#workout-paused").hidden = active.pausedAt == null || reviewing;
+    if (reviewing) {
+      workoutExercises.replaceChildren();
+      renderSummary();
+      updateWorkoutProgress();
+      return;
+    }
+    const index = active.exerciseIndex;
+    const exercise = active.exercises[index];
+    const source = catalog.get(exercise.id);
+    const card = document.createElement("section");
+    card.className = "workout-exercise-card";
+    const hero = document.createElement("div"); hero.className = "workout-exercise-hero";
+    if (source) {
+      const image = document.createElement("span");
+      image.className = "exercise-preview workout-exercise-image";
+      image.setAttribute("aria-hidden", "true");
+      image.append(exerciseIllustrations.create(source));
+      hero.append(image);
+    }
+    const copy = document.createElement("div");
+    const title = document.createElement("h3");
+    title.id = "workout-exercise-title"; title.tabIndex = -1; title.textContent = exercise.name;
+    const equipment = document.createElement("p"); equipment.className = "planner-note";
+    equipment.textContent = source?.type || exercise.equipment || "Eigene Übung";
+    const planned = document.createElement("p"); planned.className = "workout-prescription";
+    planned.textContent = `Vorgabe: ${exercise.done.length} × ${exercise.reps} Wiederholungen`;
+    copy.append(title, equipment, planned); hero.append(copy); card.append(hero);
+    if (source?.steps?.length) {
+      const instructions = document.createElement("details"); instructions.className = "workout-instructions";
+      const label = document.createElement("summary"); label.textContent = "Ausführung ansehen";
+      const gear = document.createElement("p"); gear.textContent = source.gear;
+      const steps = document.createElement("ol");
+      steps.replaceChildren(...source.steps.map((text) => { const li = document.createElement("li"); li.textContent = text; return li; }));
+      instructions.append(label, gear, steps); card.append(instructions);
+    }
+    if (exercise.skipped) {
+      const note = document.createElement("p"); note.className = "workout-notice";
+      note.textContent = "Offene Sätze übersprungen. Du kannst diese Übung wieder aufnehmen.";
+      card.append(note);
+    }
+    const fieldset = document.createElement("fieldset"); fieldset.className = "workout-sets";
+    fieldset.disabled = active.pausedAt != null || exercise.skipped;
+    const legend = document.createElement("legend"); legend.textContent = "Deine Sätze";
+    const note = document.createElement("p"); note.className = "planner-note";
+    note.textContent = "Tatsächliche Werte eintragen und abhaken. Gewicht ohne Zusatzlast: 0 kg.";
+    const boxes = document.createElement("div"); boxes.className = "workout-set-grid";
+    const labels = document.createElement("div"); labels.className = "workout-set-labels";
+    for (const text of ["Satz", "kg", "Wdh.", "Fertig"]) {
+      const label = document.createElement("span"); label.textContent = text; labels.append(label);
+    }
+    boxes.append(labels);
+    exercise.done.forEach((checked, set) => {
+      const row = document.createElement("div"); row.className = "workout-set-row";
+      const number = document.createElement("span"); number.textContent = set + 1; row.append(number);
+      for (const [field, label, min, max, step, value] of [
+        ["weights", "Gewicht in kg", 0, 2000, "any", exercise.weights[set]],
+        ["setReps", "Wiederholungen", 1, 1000, "1", exercise.setReps[set]],
+      ]) {
+        const input = document.createElement("input");
+        input.type = "number"; input.inputMode = field === "weights" ? "decimal" : "numeric";
+        input.min = min; input.max = max; input.step = step; input.required = true;
+        input.value = value; input.placeholder = field === "weights" ? "kg" : String(exercise.reps);
+        input.dataset.field = field;
+        input.setAttribute("aria-label", label + ", Satz " + (set + 1) + ", " + exercise.name);
+        input.addEventListener("input", () => {
+          if (!journal.active || journal.active.pausedAt != null) return;
+          const next = structuredClone(journal.active);
+          next.exercises[index][field][set] = input.value === "" ? "" : input.valueAsNumber;
+          // An edited, invalid value cannot remain a completed set.
+          if (!input.validity.valid) {
+            next.exercises[index].done[set] = false;
+            row.querySelector('[type="checkbox"]').checked = false;
           }
-          const active = structuredClone(journal.active);
-          active.exercises[index].done[set] = box.checked;
-          if (box.checked) active.restUntil = Date.now() + 3 * 60_000;
-          if (writeJournal({ ...journal, active }, workoutStatus)) updateWorkoutProgress();
-          else box.checked = journal.active.exercises[index].done[set];
+          if (saveActive(next)) updateWorkoutProgress();
         });
-        row.append(box);
-        boxes.append(row);
+        row.append(input);
+      }
+      const box = document.createElement("input"); box.type = "checkbox"; box.checked = checked;
+      box.setAttribute("aria-label", "Satz " + (set + 1) + " für " + exercise.name + " abgeschlossen");
+      box.addEventListener("change", () => {
+        if (!journal.active || journal.active.pausedAt != null) return;
+        if (box.checked && [...row.querySelectorAll('input[type="number"]')].some((input) => !input.reportValidity())) {
+          box.checked = journal.active.exercises[index].done[set]; return;
+        }
+        const next = structuredClone(journal.active);
+        next.exercises[index].done[set] = box.checked;
+        if (box.checked) next.restUntil = Date.now() + 3 * 60_000;
+        if (saveActive(next)) updateWorkoutProgress();
+        else box.checked = checked;
       });
-      fieldset.append(legend, reps, boxes);
-      return fieldset;
-    }));
+      row.append(box); boxes.append(row);
+    });
+    fieldset.append(legend, note, boxes); card.append(fieldset);
+    workoutExercises.replaceChildren(card);
+    document.querySelector("#workout-previous").disabled = index === 0;
+    document.querySelector("#workout-next").textContent = index === active.exercises.length - 1 ? "Zusammenfassung" : "Nächste Übung";
+    const skip = document.querySelector("#workout-skip");
+    skip.textContent = exercise.skipped ? "Übung wieder aufnehmen" : exercise.done.some(Boolean) ? "Offene Sätze überspringen" : "Übung überspringen";
+    skip.disabled = active.pausedAt != null || exercise.done.every(Boolean);
     updateWorkoutProgress();
+  }
+
+  function navigateExercise(index) {
+    if (!journal?.active) return;
+    const next = journal.active.stage === "summary" ? workoutState.resume(journal.active) : structuredClone(journal.active);
+    next.stage = "exercise";
+    next.exerciseIndex = Math.max(0, Math.min(index, next.exercises.length - 1));
+    if (!saveActive(next)) return;
+    renderWorkout(); dialog.scrollTop = 0;
+    document.querySelector("#workout-exercise-title").focus({ preventScroll: true });
+  }
+
+  function showSummary() {
+    if (!journal?.active) return;
+    const next = workoutState.pause(journal.active);
+    next.stage = "summary";
+    if (!saveActive(next)) return;
+    renderWorkout(); dialog.scrollTop = 0;
+    document.querySelector("#workout-summary-title").focus({ preventScroll: true });
+  }
+
+  function pauseAndLeave() {
+    if (journal?.active && !saveActive(workoutState.pause(journal.active))) return;
+    dialog.close(); render();
   }
 
   function openWorkout(resume = false) {
     if (!storageKey) return;
-    if (resume && !journal.active) return;
+    journal = readJournal();
+    if (resume && !journal.active) { render(); return; }
     if (journal.active && !resume && !selectedActiveWorkout()) return;
     status.textContent = "";
     if (!journal.active) {
       const session = selectedSession();
       if (!session?.exercises.length) return;
       const entries = exercisesForToday(session);
-      if (!entries.length) {
-        status.textContent = "Wähle Equipment aus, für das Übungen verfügbar sind.";
-        return;
-      }
-      const active = {
-        date: dateKey(selectedDate),
-        startedAt: Date.now(),
+      if (!entries.length) { status.textContent = "Wähle Equipment aus, für das Übungen verfügbar sind."; return; }
+      const active = workoutState.normalize({
+        id: crypto.randomUUID(), date: dateKey(selectedDate), startedAt: Date.now(),
         sourcePlanId: document.querySelector("#account-plans").value,
-        sourceSession: JSON.stringify(session),
-        name: session.name,
+        sourceSession: JSON.stringify(session), name: session.name,
         exercises: entries.map((entry) => {
           const exercise = catalog.get(entry.id);
-          return {
-            id: entry.id,
-            name: exercise?.name ?? entry.name,
-            muscles: primaryMuscles(exercise),
-            reps: entry.reps,
-            done: Array(entry.sets).fill(false),
-            weights: Array(entry.sets).fill(""),
-            setReps: Array(entry.sets).fill(entry.reps),
-          };
+          return { id: entry.id, name: exercise?.name ?? entry.name, equipment: exercise?.type ?? entry.equipment,
+            muscles: primaryMuscles(exercise), reps: entry.reps, done: Array(entry.sets).fill(false),
+            weights: Array(entry.sets).fill(""), setReps: Array(entry.sets).fill(entry.reps) };
         }),
-      };
+      });
       if (!writeJournal({ ...journal, active }, status)) return;
-    }
+    } else if (journal.active.stage !== "summary" && !saveActive(workoutState.resume(journal.active))) return;
     renderWorkout();
     if (optionsDialog.open) optionsDialog.close();
     if (activityDialog.open) activityDialog.close();
-    dialog.showModal();
-    dialog.scrollTop = 0;
-    render();
-    renderTimers();
+    dialog.showModal(); dialog.scrollTop = 0; render(); renderTimers();
   }
   start.addEventListener("click", () => openWorkout());
   activeWidget.addEventListener("click", () => openWorkout(true));
+  document.querySelector("#workout-leave").addEventListener("click", pauseAndLeave);
+  dialog.addEventListener("cancel", (event) => { event.preventDefault(); pauseAndLeave(); });
+  pauseButton.addEventListener("click", () => {
+    if (!journal?.active) return;
+    const next = journal.active.pausedAt != null ? workoutState.resume(journal.active) : workoutState.pause(journal.active);
+    if (saveActive(next)) renderWorkout();
+  });
+  document.querySelector("#workout-previous").addEventListener("click", () => navigateExercise(journal.active.exerciseIndex - 1));
+  document.querySelector("#workout-next").addEventListener("click", () => {
+    if (journal.active.exerciseIndex === journal.active.exercises.length - 1) showSummary();
+    else navigateExercise(journal.active.exerciseIndex + 1);
+  });
+  document.querySelector("#workout-review").addEventListener("click", showSummary);
+  document.querySelector("#workout-back").addEventListener("click", () => navigateExercise(journal.active.exerciseIndex));
+  document.querySelector("#workout-skip").addEventListener("click", () => {
+    const next = structuredClone(journal.active);
+    const exercise = next.exercises[next.exerciseIndex];
+    const restoring = exercise.skipped;
+    exercise.skipped = !restoring;
+    next.restUntil = null;
+    if (!saveActive(next)) return;
+    if (restoring) renderWorkout();
+    else if (next.exerciseIndex === next.exercises.length - 1) showSummary();
+    else navigateExercise(next.exerciseIndex + 1);
+  });
+  incomplete.addEventListener("change", updateWorkoutProgress);
 
-  finish.addEventListener("click", () => {
-    if (!journal.active) return;
-    const { date, name, exercises, startedAt } = journal.active;
-    const groups = new Map();
-    let totalSets = 0;
-    let volume = 0;
-    for (const exercise of exercises) {
-      const count = exercise.done.filter(Boolean).length;
-      if (!count) continue;
-      totalSets += count;
-      exercise.done.forEach((done, index) => {
-        if (done) volume += Number(exercise.weights[index] || 0) * exercise.setReps[index];
-      });
-      for (const muscle of exercise.muscles) groups.set(muscle, (groups.get(muscle) ?? 0) + count);
+  finish.addEventListener("click", async () => {
+    if (finishing || !journal?.active || journal.active.stage !== "summary" || finish.disabled) return;
+    const id = journal.active.id;
+    const key = storageKey;
+    const epoch = accountEpoch;
+    finishing = true; updateWorkoutProgress();
+    const commit = () => {
+      if (storageKey !== key || accountEpoch !== epoch) return;
+      journal = readJournal();
+      if (!journal.active || journal.active.id !== id) { dialog.close(); render(); return; }
+      if (journal.active.stage !== "summary") { renderWorkout(); return; }
+      const totals = workoutState.summary(journal.active);
+      if (!totals.totalSets || (totals.totalSets < totals.plannedSets && !incomplete.checked)) { renderWorkout(); return; }
+      const next = workoutState.complete(journal, id);
+      if (!writeJournal(next, workoutStatus)) return;
+      dialog.close(); status.textContent = "Training gespeichert."; render();
+    };
+    try {
+      // Serialize concurrent finish clicks across tabs on supported browsers.
+      if (navigator.locks) await navigator.locks.request(`fitness-workout:${key}`, commit);
+      else commit();
+    } catch {
+      if (storageKey === key && accountEpoch === epoch) workoutStatus.textContent = "Speichern fehlgeschlagen. Deine Einheit bleibt fortsetzbar.";
+    } finally {
+      if (accountEpoch === epoch) { finishing = false; if (journal?.active) updateWorkoutProgress(false); }
     }
-    if (!totalSets) return;
-    const workouts = [...journal.workouts, {
-      date, name, totalSets, muscleSets: [...groups], volume, exercises, startedAt,
-      minutes: Math.max(1, Math.round((Date.now() - journal.active.startedAt) / 60_000)),
-    }];
-    if (!writeJournal({ workouts, active: null }, workoutStatus)) return;
-    dialog.close();
-    status.textContent = "Training gespeichert.";
-    render();
   });
 
   document.querySelector("#strength-discard").addEventListener("click", () => {
     if (!window.confirm("Dieses Training verwerfen?")) return;
     if (!writeJournal({ ...journal, active: null }, workoutStatus)) return;
-    dialog.close();
-    render();
+    dialog.close(); render();
   });
 
   document.addEventListener("fitness:planchange", render);
@@ -524,14 +661,14 @@ const strengthDashboard = (() => {
   });
   function renderTimers() {
     if (!journal?.active) return;
-    const elapsed = Math.max(0, Math.floor((Date.now() - journal.active.startedAt) / 1000));
-    document.querySelector("#workout-elapsed").value = Math.floor(elapsed / 60).toString().padStart(2, "0") + ":" + (elapsed % 60).toString().padStart(2, "0");
-    const rest = Math.max(0, Math.ceil(((journal.active.restUntil ?? 0) - Date.now()) / 1000));
-    restSkip.hidden = rest === 0;
+    document.querySelector("#workout-elapsed").value = formatDuration(workoutState.elapsed(journal.active));
+    const rest = Math.max(0, Math.ceil((journal.active.pausedAt != null ? journal.active.restRemaining ?? 0 : (journal.active.restUntil ?? 0) - Date.now()) / 1000));
+    restSkip.hidden = rest === 0 || journal.active.stage === "summary";
     document.querySelector("#workout-rest").textContent = Math.floor(rest / 60) + ":" + (rest % 60).toString().padStart(2, "0");
   }
   restSkip.addEventListener("click", () => {
-    const active = { ...journal.active, restUntil: null };
+    if (!journal?.active) return;
+    const active = { ...journal.active, restUntil: null, restRemaining: 0 };
     if (writeJournal({ ...journal, active }, workoutStatus)) renderTimers();
   });
   window.setInterval(renderTimers, 1000);
@@ -547,15 +684,27 @@ const strengthDashboard = (() => {
 
   return {
     render,
+    open() {
+      selectedDate = new Date();
+      shownDate = undefined;
+      render();
+    },
     getTrainingDates: () => journal?.workouts.map(({ date }) => date) ?? [],
     close() {
+      if (dialog.open && journal?.active) saveActive(workoutState.pause(journal.active));
       for (const sheet of [dialog, optionsDialog, historyDialog, activityDialog]) {
         if (sheet.open) sheet.close();
       }
       shownPlan = undefined;
     },
     setAccount(id) {
+      if (storageKey && journal?.active) saveActive(workoutState.pause(journal.active));
       if (dialog.open) dialog.close();
+      accountEpoch++;
+      finishing = false;
+      workoutExercises.replaceChildren();
+      document.querySelector("#workout-summary-exercises").replaceChildren();
+      workoutStatus.textContent = "";
       storageKey = id ? `fitness-app.workout-journal.v1.${id}` : null;
       journal = readJournal();
       selectedDate = new Date();

@@ -127,6 +127,7 @@ function renderRoute(focusHeading = false) {
   const isHome = active === links[0];
   const isStrength = active.hash === "#krafttraining";
   const showStrength = isStrength && !isPlanner && !showLibrary && !showCardio && !showMobility;
+  const enteringStrength = showStrength && strength.hidden;
   if (!showLibrary && exerciseDetail.open) exerciseDetail.close();
   if (!isPlanner) trainingPlanner.closeDialogs();
   if (!showStrength) strengthDashboard.close();
@@ -137,7 +138,8 @@ function renderRoute(focusHeading = false) {
   strength.hidden = !showStrength;
   statistics.hidden = active.hash !== "#statistiken";
   document.querySelector("#training-state").hidden = !showStrength;
-  if (showStrength || !statistics.hidden) strengthDashboard.render();
+  if (enteringStrength) strengthDashboard.open();
+  else if (showStrength || !statistics.hidden) strengthDashboard.render();
   planner.hidden = !isPlanner;
   cardio.hidden = !showCardio;
   nutrition.hidden = active.hash !== "#ernaehrung";

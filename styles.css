@@ -851,6 +851,57 @@ a.plan-button { display: inline-flex; align-items: center; text-decoration: none
 #account-dialog #plan-account { box-shadow: none; }
 .workout-sets { background: #182136; border-radius: var(--radius-control); }
 #strength-workout-title { text-transform: none; font-weight: 700; }
+
+/* The workout stays separate from the plan editor and the Cardio workspace. */
+#strength-workout-dialog { width: min(calc(100% - 1.5rem), 42rem); padding-bottom: max(var(--space-5), env(safe-area-inset-bottom)); }
+.workout-toolbar { position: sticky; top: 0; z-index: 3; margin: 0 calc(-1 * var(--dialog-padding)) var(--space-4); padding: var(--space-2) var(--dialog-padding); border-bottom: 1px solid var(--border); background: #232D43; box-shadow: 0 8px 20px rgb(0 0 0 / .15); }
+.workout-toolbar .detail-header { position: static; margin: 0 0 var(--space-2); padding: 0; border: 0; background: transparent; }
+.workout-toolbar h2 { min-width: 0; margin: 0; font-size: 1rem; }
+.workout-toolbar .plan-button { flex: none; font-size: .8125rem; }
+.workout-toolbar .planner-note { margin: 0 0 var(--space-2); font-size: .75rem; }
+.workout-toolbar .workout-timer-bar { padding: 0; flex-wrap: wrap; }
+.workout-timer-bar svg { width: 1.125rem; height: 1.125rem; }
+#workout-elapsed { font-weight: 750; font-size: 1.125rem; }
+.workout-rest { width: 100%; margin-bottom: var(--space-4); flex-wrap: wrap; color: var(--accent); }
+.workout-progress-copy { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-2); font-size: .8125rem; }
+.workout-progress-copy span { color: var(--muted); }
+#workout-progress { width: 100%; height: .375rem; margin: var(--space-3) 0 var(--space-5); }
+.workout-exercise-card { min-width: 0; }
+.workout-exercise-hero { display: flex; gap: var(--space-3); align-items: center; margin-bottom: var(--space-4); }
+.workout-exercise-hero > div { min-width: 0; }
+.workout-exercise-image { width: clamp(5rem, 24vw, 8rem); border: 1px solid var(--border); border-radius: var(--radius-control); box-shadow: var(--shadow-card); }
+.workout-exercise-image svg { width: 100%; height: auto; }
+#workout-exercise-title { font-size: clamp(1.125rem, 4.5vw, 1.5rem); line-height: 1.25; margin: 0; overflow-wrap: anywhere; }
+#workout-exercise-title:focus, #workout-summary-title:focus { outline: none; }
+.workout-instructions summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: var(--space-1); }
+.workout-exercise-hero .planner-note { margin: var(--space-2) 0; font-size: .8125rem; }
+.workout-prescription { color: var(--accent); font-size: .8125rem; line-height: 1.5; margin: 0; }
+.workout-instructions { margin-bottom: var(--space-4); font-size: .875rem; line-height: 1.6; }
+.workout-instructions summary { min-height: 2.75rem; align-content: center; cursor: pointer; color: var(--accent); }
+.workout-instructions p { color: var(--muted); }
+.workout-instructions ol { padding-left: 1.25rem; }
+.workout-instructions li + li { margin-top: var(--space-2); }
+#strength-workout-dialog .workout-sets { margin: 0; min-width: 0; border: 1px solid var(--border); padding: var(--space-3); box-shadow: var(--shadow-inset); }
+#strength-workout-dialog .workout-sets .planner-note { margin: 0; font-size: .75rem; }
+.workout-sets:disabled { opacity: .65; }
+.workout-navigation { position: sticky; bottom: 0; z-index: 2; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); padding: var(--space-3) 0; background: var(--surface); }
+.workout-navigation .plan-button { min-width: 0; font-size: .8125rem; white-space: normal; text-align: center; }
+#workout-skip, #workout-review, #strength-discard { display: block; min-height: 2.75rem; width: 100%; padding: var(--space-2); font-size: .8125rem; }
+#workout-review { color: var(--muted); }
+.workout-notice { padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-control); color: var(--text); background: var(--raised); font-size: .8125rem; line-height: 1.6; margin: 0 0 var(--space-4); }
+.workout-summary-totals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); margin-block: var(--space-4); }
+.workout-summary-totals > div { padding: var(--space-3) var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--control-gradient); box-shadow: var(--shadow-control); }
+.workout-summary-totals dt { color: var(--muted); font-size: .6875rem; }
+.workout-summary-totals dd { margin: var(--space-2) 0 0; font-size: 1.125rem; color: var(--accent); font-weight: 750; }
+.workout-summary-exercise { display: grid; gap: var(--space-2); width: 100%; min-height: 3.5rem; padding: var(--space-3) 0; border: 0; color: var(--text); background: transparent; font: inherit; text-align: left; cursor: pointer; overflow-wrap: anywhere; }
+.workout-summary-exercise strong { font-size: .875rem; }
+.workout-summary-exercise small { color: var(--muted); font-size: .75rem; }
+.workout-confirm { display: flex; gap: var(--space-3); align-items: center; min-height: 2.75rem; margin-block: var(--space-4); font-size: .8125rem; line-height: 1.5; }
+.workout-confirm input { flex: none; width: 1.5rem; height: 1.5rem; accent-color: var(--accent); }
+.workout-storage-note { font-size: .75rem; }
+@media (max-width: 40rem) {
+  #strength-workout-dialog { width: 100%; padding-top: env(safe-area-inset-top); }
+}
 .active-workout { color: var(--text); background: var(--control-gradient); border: 1px solid var(--control-border); box-shadow: var(--shadow-card); }
 .live-dot { background: var(--accent-blue); box-shadow: 0 0 0 4px rgb(145 216 255 / .1); }
 
@@ -956,11 +1007,13 @@ a.plan-button { display: inline-flex; align-items: center; text-decoration: none
 .session-preview-strip li { display: grid; align-items: center; flex: 0 0 3.1rem; }
 .session-preview-strip li > div { display: none; }
 .session-preview-strip .exercise-preview { width: 3.1rem; background: linear-gradient(145deg, #3B4663, #29344D); border: 1px solid #576281; border-radius: .75rem; }
-.session-start-overlay { position: absolute; z-index: 1; inset: 0; width: 100%; height: 100%; background: transparent; border: 0; border-radius: inherit; cursor: pointer; }
-.session-start-hint { display: flex; justify-content: space-between; align-items: center; margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px solid #4A5574; color: var(--accent); font-size: .8125rem; font-weight: 650; }
-.session-start-hint > span { display: grid; place-items: center; width: 1.75rem; height: 1.75rem; border-radius: .625rem; background: var(--accent-gradient); color: #1D233D; box-shadow: var(--shadow-control); font-size: 1.1rem; }
-.session-start-overlay:disabled { cursor: default; }
-.session-card:has(.session-start-overlay:disabled) .session-start-hint { color: var(--muted); }
+#strength-start { width: 100%; margin-top: var(--space-4); }
+#strength-session-date { margin: var(--space-3) 0 0; font-size: var(--text-small); }
+#strength-session-preview { display: grid; height: auto; gap: var(--space-2); }
+#strength-session-preview li { display: flex; gap: var(--space-3); min-width: 0; }
+#strength-session-preview li > div { display: grid; min-width: 0; gap: .2rem; }
+#strength-session-preview .exercise-name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: .8125rem; }
+#strength-session-preview small { font-size: .75rem; color: var(--muted); }
 .empty-training-day { display: grid; justify-items: start; gap: var(--space-3); }
 .empty-training-day .planner-note { margin: 0; }
 #strength-status:empty { display: none; }

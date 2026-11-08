@@ -16,6 +16,7 @@
   <script src="plan-generator.js" defer></script>
   <script src="training-planner.js" defer></script>
   <script src="exercise-library.js" defer></script>
+  <script src="workout-state.js" defer></script>
   <script src="strength-dashboard.js" defer></script>
   <script src="daily-tracking.js" defer></script>
   <script src="app.js" defer></script>
@@ -142,11 +143,11 @@
       <p id="strength-schedule" class="training-day-note"></p>
       <section class="card library-panel session-card" id="strength-session-card" aria-labelledby="strength-today">
         <div class="session-card-heading"><span class="session-icon"><svg aria-hidden="true"><use href="#icon-strength"/></svg></span><h2 id="strength-today">Krafttraining</h2><button id="strength-menu" class="card-menu-button" type="button" aria-label="Trainingseinheit auswählen und anpassen" aria-haspopup="dialog">⋮</button></div>
+        <p class="planner-note" id="strength-session-date"></p>
         <div class="session-facts" id="strength-session-facts"></div>
         <p class="session-muscles" id="strength-session-muscles"></p>
         <ul id="strength-session-preview" class="session-preview-strip"></ul>
-        <button class="session-start-overlay" id="strength-start" type="button" aria-haspopup="dialog" hidden><span class="sr-only">Training starten</span></button>
-        <span class="session-start-hint" id="strength-start-hint" aria-hidden="true">Training starten <span>›</span></span>
+        <button class="plan-button primary" id="strength-start" type="button" aria-haspopup="dialog" hidden>Training starten</button>
       </section>
       <section class="card library-panel empty-training-day" id="strength-empty-day" aria-labelledby="strength-empty-title" hidden>
         <span class="session-icon"><svg aria-hidden="true"><use href="#icon-rest"/></svg></span>
@@ -392,19 +393,41 @@
     <ol id="detail-steps"></ol>
   </dialog>
   <dialog id="strength-workout-dialog" aria-labelledby="strength-workout-title">
+    <div class="workout-toolbar">
     <div class="detail-header">
       <h2 id="strength-workout-title">Training</h2>
-      <form method="dialog"><button class="plan-button" type="submit">Schließen</button></form>
+      <button class="plan-button" id="workout-leave" type="button" aria-label="Training pausieren und verlassen">Verlassen</button>
     </div>
     <p id="workout-scheduled-date" class="planner-note"></p>
-    <div class="workout-timer-bar"><span><svg aria-hidden="true"><use href="#icon-clock"/></svg><output id="workout-elapsed">00:00</output></span><button class="text-button" id="workout-rest-skip" type="button" hidden><span id="workout-rest"></span> · Pause beenden</button></div>
-    <p class="planner-note">Trage Gewicht und Wiederholungen ein und hake deine Sätze ab.</p>
-    <div id="strength-workout-exercises"></div>
-    <p id="strength-workout-status" class="planner-note" role="status"></p>
-    <div class="planner-actions">
-      <button id="strength-finish" class="plan-button primary" type="button">Training abschließen</button>
-      <button id="strength-discard" class="plan-button" type="button">Training verwerfen</button>
+    <div class="workout-timer-bar"><span><svg aria-hidden="true"><use href="#icon-clock"/></svg><output id="workout-elapsed" aria-label="Aktive Trainingsdauer">00:00</output></span><button class="plan-button" id="workout-pause" type="button">Pausieren</button></div>
     </div>
+    <p id="workout-paused" class="workout-notice" hidden>Training pausiert. Deine Eingaben sind gespeichert.</p>
+    <button class="plan-button workout-rest" id="workout-rest-skip" type="button" hidden>Erholung <span id="workout-rest"></span> · Pause beenden</button>
+    <div id="workout-exercise-stage">
+      <div class="workout-progress-copy"><strong id="workout-exercise-progress"></strong><span id="workout-set-progress"></span></div>
+      <progress id="workout-progress" value="0" max="1" aria-label="Absolvierte Sätze"></progress>
+      <div id="strength-workout-exercises"></div>
+      <div class="workout-navigation">
+        <button id="workout-previous" class="plan-button" type="button">Vorherige Übung</button>
+        <button id="workout-next" class="plan-button primary" type="button">Nächste Übung</button>
+      </div>
+      <button id="workout-skip" class="text-button" type="button">Übung überspringen</button>
+      <button id="workout-review" class="text-button" type="button">Zur Zusammenfassung</button>
+    </div>
+    <section id="workout-summary" hidden aria-labelledby="workout-summary-title">
+      <h3 id="workout-summary-title" tabindex="-1">Deine Einheit im Überblick</h3>
+      <dl class="workout-summary-totals" id="workout-summary-totals"></dl>
+      <ul id="workout-summary-exercises" class="entry-list"></ul>
+      <p id="workout-unfinished" class="workout-notice"></p>
+      <label id="workout-confirm-label" class="workout-confirm"><input type="checkbox" id="workout-confirm-incomplete">Einheit mit offenen oder übersprungenen Sätzen abschließen</label>
+      <div class="planner-actions">
+        <button id="strength-finish" class="plan-button primary" type="button">Training abschließen</button>
+        <button id="workout-back" class="plan-button" type="button">Weiter trainieren</button>
+      </div>
+    </section>
+    <p id="strength-workout-status" class="planner-note" role="status"></p>
+    <p class="planner-note workout-storage-note">Für dein Konto in diesem Browser gespeichert.</p>
+    <button id="strength-discard" class="text-button" type="button">Training verwerfen</button>
   </dialog>
   <button id="active-workout" class="active-workout" type="button" hidden><span class="live-dot"></span><span><strong>Training läuft</strong><small id="active-workout-name"></small></span><svg aria-hidden="true"><use href="#icon-arrow"/></svg></button>
   <dialog id="account-dialog" aria-labelledby="account-dialog-title"><div class="detail-header"><h2 id="account-dialog-title">Dein Konto</h2><form method="dialog"><button class="plan-button" type="submit">Schließen</button></form></div><div class="planner-actions"><button class="plan-button" id="daily-open" type="button" aria-haspopup="dialog">Schritte &amp; Tagesziele</button></div></dialog>
