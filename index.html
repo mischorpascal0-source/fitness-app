@@ -392,42 +392,51 @@
     <h3>Ausführung</h3>
     <ol id="detail-steps"></ol>
   </dialog>
-  <dialog id="strength-workout-dialog" aria-labelledby="strength-workout-title">
-    <div class="workout-toolbar">
-    <div class="detail-header">
-      <h2 id="strength-workout-title">Training</h2>
-      <button class="plan-button" id="workout-leave" type="button" aria-label="Training pausieren und verlassen">Verlassen</button>
-    </div>
-    <p id="workout-scheduled-date" class="planner-note"></p>
-    <div class="workout-timer-bar"><span><svg aria-hidden="true"><use href="#icon-clock"/></svg><output id="workout-elapsed" aria-label="Aktive Trainingsdauer">00:00</output></span><button class="plan-button" id="workout-pause" type="button">Pausieren</button></div>
-    </div>
-    <p id="workout-paused" class="workout-notice" hidden>Training pausiert. Deine Eingaben sind gespeichert.</p>
-    <button class="plan-button workout-rest" id="workout-rest-skip" type="button" hidden>Erholung <span id="workout-rest"></span> · Pause beenden</button>
-    <div id="workout-exercise-stage">
-      <div class="workout-progress-copy"><strong id="workout-exercise-progress"></strong><span id="workout-set-progress"></span></div>
-      <progress id="workout-progress" value="0" max="1" aria-label="Absolvierte Sätze"></progress>
-      <div id="strength-workout-exercises"></div>
-      <div class="workout-navigation">
-        <button id="workout-previous" class="plan-button" type="button">Vorherige Übung</button>
-        <button id="workout-next" class="plan-button primary" type="button">Nächste Übung</button>
+  <dialog id="strength-workout-dialog" class="workout-page" aria-labelledby="strength-workout-title">
+    <div class="workout-page-shell">
+      <div class="workout-toolbar">
+        <div class="detail-header"><div><span class="eyebrow">Deine Trainingseinheit</span><h2 id="strength-workout-title">Training</h2></div><button class="plan-button" id="workout-leave" type="button" aria-label="Training pausieren und verlassen">Verlassen</button></div>
+        <p id="workout-scheduled-date" class="planner-note"></p>
+        <div class="workout-timer-bar"><span><svg aria-hidden="true"><use href="#icon-clock"/></svg><output id="workout-elapsed" aria-label="Aktive Trainingsdauer">00:00</output></span><button class="plan-button" id="workout-pause" type="button">Pausieren</button></div>
       </div>
-      <button id="workout-skip" class="text-button" type="button">Übung überspringen</button>
-      <button id="workout-review" class="text-button" type="button">Zur Zusammenfassung</button>
-    </div>
-    <section id="workout-summary" hidden aria-labelledby="workout-summary-title">
-      <h3 id="workout-summary-title" tabindex="-1">Deine Einheit im Überblick</h3>
-      <dl class="workout-summary-totals" id="workout-summary-totals"></dl>
-      <ul id="workout-summary-exercises" class="entry-list"></ul>
-      <p id="workout-unfinished" class="workout-notice"></p>
-      <label id="workout-confirm-label" class="workout-confirm"><input type="checkbox" id="workout-confirm-incomplete">Einheit mit offenen oder übersprungenen Sätzen abschließen</label>
-      <div class="planner-actions">
-        <button id="strength-finish" class="plan-button primary" type="button">Training abschließen</button>
-        <button id="workout-back" class="plan-button" type="button">Weiter trainieren</button>
+      <p id="workout-paused" class="workout-notice" hidden>Training pausiert. Deine Eingaben sind gespeichert.</p>
+      <button class="plan-button workout-rest" id="workout-rest-skip" type="button" hidden>Erholung <span id="workout-rest"></span> · Pause beenden</button>
+      <div id="workout-exercise-stage">
+        <div class="workout-progress-copy"><strong>Deine Übungen</strong><span id="workout-set-progress"></span></div>
+        <progress id="workout-progress" value="0" max="1" aria-label="Absolvierte Sätze"></progress>
+        <p id="workout-order-help" class="planner-note">Tippe eine Übung an. Am Griff kannst du sie verschieben – mit der Tastatur per Pfeiltasten.</p>
+        <ol id="strength-workout-exercises" class="workout-exercise-list"></ol>
+        <div id="workout-replaced-history" hidden></div>
+        <button id="workout-review" class="plan-button primary" type="button">Training beenden · Zusammenfassung</button>
       </div>
-    </section>
-    <p id="strength-workout-status" class="planner-note" role="status"></p>
-    <p class="planner-note workout-storage-note">Für dein Konto in diesem Browser gespeichert.</p>
-    <button id="strength-discard" class="text-button" type="button">Training verwerfen</button>
+      <section id="workout-summary" hidden aria-labelledby="workout-summary-title">
+        <h3 id="workout-summary-title" tabindex="-1">Deine Einheit im Überblick</h3>
+        <dl class="workout-summary-totals" id="workout-summary-totals"></dl>
+        <ul id="workout-summary-exercises" class="entry-list"></ul>
+        <p id="workout-unfinished" class="workout-notice"></p>
+        <label id="workout-confirm-label" class="workout-confirm"><input type="checkbox" id="workout-confirm-incomplete">Einheit mit offenen oder übersprungenen Sätzen abschließen</label>
+        <div class="planner-actions"><button id="strength-finish" class="plan-button primary" type="button">Training abschließen</button><button id="workout-back" class="plan-button" type="button">Weiter trainieren</button></div>
+      </section>
+      <section id="workout-plan-changes" hidden aria-labelledby="workout-plan-changes-title">
+        <span class="eyebrow">Training gespeichert</span>
+        <h3 id="workout-plan-changes-title" tabindex="-1">Möchtest du deine Änderungen für zukünftige Trainings übernehmen?</h3>
+        <p class="planner-note">Die Änderungen betreffen nur diese Einheit deines ursprünglichen Plans. Deine tatsächlich absolvierten Werte bleiben im Trainingsprotokoll.</p>
+        <ul id="workout-plan-change-list"></ul>
+        <div class="planner-actions"><button id="workout-apply-plan" class="plan-button primary" type="button">Für zukünftige Trainings übernehmen</button><button id="workout-keep-session" class="plan-button" type="button">Nur für dieses Training</button></div>
+      </section>
+      <p id="strength-workout-status" class="planner-note" role="status"></p>
+      <p class="planner-note workout-storage-note">Für dein Konto in diesem Browser gespeichert.</p>
+      <button id="strength-discard" class="text-button" type="button">Training verwerfen</button>
+    </div>
+  </dialog>
+  <dialog id="workout-exercise-dialog" aria-labelledby="workout-exercise-dialog-title">
+    <div class="detail-header"><h2 id="workout-exercise-dialog-title">Übung</h2><button id="workout-exercise-close" class="plan-button" type="button">Zur Liste</button></div>
+    <p id="workout-exercise-context" class="planner-note"></p>
+    <div class="workout-timer-bar"><span><output class="workout-elapsed-mirror" aria-label="Aktive Trainingsdauer">00:00</output></span><button id="workout-exercise-pause" class="plan-button" type="button">Pausieren</button></div>
+    <p id="workout-exercise-paused" class="workout-notice" hidden>Training pausiert. Zum Erfassen von Sätzen bitte fortsetzen.</p>
+    <button id="workout-exercise-rest" class="plan-button workout-rest" type="button" hidden>Erholung <span></span> · Pause beenden</button>
+    <div id="workout-exercise-content"></div>
+    <p id="workout-exercise-status" class="planner-note" role="status"></p>
   </dialog>
   <button id="active-workout" class="active-workout" type="button" hidden><span class="live-dot"></span><span><strong>Training läuft</strong><small id="active-workout-name"></small></span><svg aria-hidden="true"><use href="#icon-arrow"/></svg></button>
   <dialog id="account-dialog" aria-labelledby="account-dialog-title"><div class="detail-header"><h2 id="account-dialog-title">Dein Konto</h2><form method="dialog"><button class="plan-button" type="submit">Schließen</button></form></div><div class="planner-actions"><button class="plan-button" id="daily-open" type="button" aria-haspopup="dialog">Schritte &amp; Tagesziele</button></div></dialog>

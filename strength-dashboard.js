@@ -71,12 +71,13 @@ const strengthDashboard = (() => {
       const stored = storageKey && JSON.parse(localStorage.getItem(storageKey));
       if (Array.isArray(stored?.workouts)) {
         stored.active = workoutState.normalize(stored.active);
+        stored.pendingPlanChanges ??= [];
         return stored;
       }
     } catch {
       // An unreadable browser entry has no usable workouts.
     }
-    return { workouts: [], active: null };
+    return { workouts: [], active: null, pendingPlanChanges: [] };
   }
 
   function writeJournal(next, messageElement) {
@@ -86,6 +87,7 @@ const strengthDashboard = (() => {
       const latest = readJournal();
       if ((latest.active?.id ?? null) !== (journal?.active?.id ?? null)) {
         journal = latest;
+        if (sheet.open) sheet.close();
         if (dialog.open) dialog.close();
         render();
         messageElement.textContent = "Die Einheit wurde in einem anderen Fenster geändert. Bitte öffne sie erneut.";
@@ -176,14 +178,14 @@ const strengthDashboard = (() => {
     const equipment = [...equipmentChoices.querySelectorAll(":checked")].map(({ value }) => value);
     const retained = new Set(session.exercises.filter((entry) => equipment.includes(catalog.get(entry.id)?.type)).map(({ id }) => id));
     const selected = [];
-    for (const entry of session.exercises) {
+    for (const [sourceIndex, entry] of session.exercises.entries()) {
       const exercise = catalog.get(entry.id);
       if (exercise && !equipment.includes(exercise.type)) {
         const alternative = exerciseCatalog.find((candidate) =>
           candidate.group === exercise.group && equipment.includes(candidate.type) &&
           !retained.has(candidate.id) && !selected.some(({ id }) => candidate.id === id));
-        if (alternative) selected.push({ id: alternative.id, sets: entry.sets, reps: entry.reps });
-      } else if (exercise || !entry.equipment || equipment.includes(entry.equipment)) selected.push({ ...entry });
+        if (alternative) selected.push({ id: alternative.id, sets: entry.sets, reps: entry.reps, sourceIndex });
+      } else if (exercise || !entry.equipment || equipment.includes(entry.equipment)) selected.push({ ...entry, sourceIndex });
     }
     const budget = Math.floor((minutesInput.valueAsNumber + 3) / 4);
     let total = selected.reduce((sum, { sets }) => sum + sets, 0);
@@ -242,11 +244,11 @@ const strengthDashboard = (() => {
       row.append(copy);
       return row;
     }));
-    customize.hidden = Boolean(journal.active) || !session;
-    start.disabled = Boolean(journal.active && !active) || !exercises.length;
+    customize.hidden = Boolean(journal.active || pendingChange()) || !session;
+    start.disabled = Boolean(journal.active && !active) || Boolean(pendingChange()) || !exercises.length;
     const blocked = document.querySelector("#strength-active-note");
-    blocked.hidden = !journal.active || Boolean(active);
-    if (!blocked.hidden) blocked.textContent = "Es läuft noch ein anderes Training. Setze es über „Training läuft“ fort oder verwirf es, bevor du diese Einheit startest.";
+    blocked.hidden = !(journal.active && !active) && !pendingChange();
+    if (!blocked.hidden) blocked.textContent = pendingChange() ? "Dein Training ist gespeichert. Öffne „Planänderungen prüfen“, bevor du eine neue Einheit startest." : "Es läuft noch ein anderes Training. Setze es über „Training läuft“ fort oder verwirf es, bevor du diese Einheit startest.";
   }
 
   function renderHistory() {
@@ -272,11 +274,12 @@ const strengthDashboard = (() => {
     const todayKey = dateKey(new Date());
     if (lastToday !== todayKey && dateKey(selectedDate) === lastToday) selectedDate = new Date();
     lastToday = todayKey;
-    activeWidget.hidden = !storageKey || !journal?.active;
-    document.body.classList.toggle("has-active-workout", Boolean(storageKey && journal?.active));
-    document.querySelector("#active-workout-name").textContent = journal?.active?.name ?? "";
-    activeWidget.querySelector("strong").textContent = journal?.active?.pausedAt != null ? "Training pausiert" : "Training läuft";
-    activeWidget.setAttribute("aria-label", "Training fortsetzen: " + (journal?.active?.name ?? "") + (journal?.active ? ", " + fullDate.format(new Date(journal.active.date + "T12:00:00")) : ""));
+    const resumable = journal?.active ?? pendingChange();
+    activeWidget.hidden = !storageKey || !resumable;
+    document.body.classList.toggle("has-active-workout", Boolean(storageKey && resumable));
+    document.querySelector("#active-workout-name").textContent = resumable?.name ?? "";
+    activeWidget.querySelector("strong").textContent = journal?.active ? journal.active.pausedAt != null ? "Training pausiert" : "Training läuft" : "Planänderungen prüfen";
+    activeWidget.setAttribute("aria-label", (journal?.active ? "Training fortsetzen: " : "Planänderungen prüfen: ") + (resumable?.name ?? ""));
     if (!journal || (section.hidden && document.querySelector("#statistics-view").hidden)) return;
     const now = selectedDate;
     const today = dateKey(now);
@@ -330,299 +333,481 @@ const strengthDashboard = (() => {
 
   const exerciseStage = document.querySelector("#workout-exercise-stage");
   const summaryStage = document.querySelector("#workout-summary");
+  const planStage = document.querySelector("#workout-plan-changes");
   const pauseButton = document.querySelector("#workout-pause");
   const incomplete = document.querySelector("#workout-confirm-incomplete");
-  let accountEpoch = 0;
-  let finishing = false;
+  const sheet = document.querySelector("#workout-exercise-dialog");
+  const sheetContent = document.querySelector("#workout-exercise-content");
+  const sheetStatus = document.querySelector("#workout-exercise-status");
+  let accountEpoch = 0, finishing = false, applying = false;
+  let planAccess, sheetId, sheetView = "preview", candidate, drag;
+  let replaceFilters = { query: "", group: "", type: "" };
 
+  const node = (tag, className, text) => {
+    const element = document.createElement(tag);
+    if (className) element.className = className;
+    if (text != null) element.textContent = text;
+    return element;
+  };
+  const pendingChange = () => journal?.pendingPlanChanges?.[0];
+  const currentExercise = () => journal?.active?.exercises.find(({ instanceId }) => instanceId === sheetId);
   function saveActive(active) {
-    return writeJournal({ ...journal, active }, workoutStatus);
+    return writeJournal({ ...journal, active }, sheet.open ? sheetStatus : workoutStatus);
   }
-
   function formatDuration(milliseconds) {
     const seconds = Math.floor(milliseconds / 1000);
     return Math.floor(seconds / 60).toString().padStart(2, "0") + ":" + (seconds % 60).toString().padStart(2, "0");
   }
+  function imageFor(exercise, large = false) {
+    const image = node("span", "exercise-preview" + (large ? " workout-exercise-image" : ""));
+    image.setAttribute("aria-hidden", "true");
+    const source = catalog.get(exercise.id);
+    if (source) image.append(exerciseIllustrations.create(source));
+    else image.innerHTML = '<svg aria-hidden="true"><use href="#icon-strength"/></svg>';
+    return image;
+  }
 
   function updateWorkoutProgress(announce = true) {
-    if (!journal.active) return;
+    if (!journal?.active) return;
     const totals = workoutState.summary(journal.active);
-    document.querySelector("#workout-exercise-progress").textContent = `Übung ${journal.active.exerciseIndex + 1} von ${journal.active.exercises.length}`;
     document.querySelector("#workout-set-progress").textContent = `${totals.totalSets} / ${totals.plannedSets} Sätze`;
     const progress = document.querySelector("#workout-progress");
-    progress.max = totals.plannedSets;
-    progress.value = totals.totalSets;
+    progress.max = totals.plannedSets || 1; progress.value = totals.totalSets;
     if (announce) workoutStatus.textContent = `${totals.totalSets} von ${totals.plannedSets} Sätzen erledigt.`;
     finish.disabled = finishing || !totals.totalSets || (totals.totalSets < totals.plannedSets && !incomplete.checked);
     renderTimers();
   }
 
-  function renderSummary() {
-    const active = journal.active;
-    const totals = workoutState.summary(active);
-    const list = document.querySelector("#workout-summary-totals");
-    list.replaceChildren(...[
-      ["Aktive Dauer", formatDuration(totals.durationMs)],
-      ["Übungen vollständig", `${totals.completedExercises} / ${active.exercises.length}`],
-      ["Sätze absolviert", `${totals.totalSets} / ${totals.plannedSets}`],
-    ].map(([label, value]) => {
-      const item = document.createElement("div");
-      const term = document.createElement("dt"); term.textContent = label;
-      const detail = document.createElement("dd"); detail.textContent = value;
-      item.append(term, detail);
-      return item;
-    }));
-    document.querySelector("#workout-summary-exercises").replaceChildren(...active.exercises.map((exercise, index) => {
-      const row = document.createElement("li");
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "workout-summary-exercise";
-      button.dataset.workoutExercise = index;
-      const name = document.createElement("strong"); name.textContent = exercise.name;
-      const detail = document.createElement("small");
-      detail.textContent = `${exercise.done.filter(Boolean).length} / ${exercise.done.length} Sätze` + (exercise.skipped ? " · Rest übersprungen" : "") + " · Bearbeiten ›";
-      button.append(name, detail);
-      button.addEventListener("click", () => navigateExercise(index));
-      row.append(button);
+  function renderList() {
+    finishDrag();
+    workoutExercises.replaceChildren(...journal.active.exercises.map((exercise, index) => {
+      const count = exercise.done.filter(Boolean).length;
+      const state = exercise.skipped ? "Übersprungen" : count === exercise.done.length ? "Abgeschlossen" : exercise.started || count ? "Begonnen" : "Offen";
+      const row = node("li", "workout-list-item"); row.dataset.instanceId = exercise.instanceId;
+      row.classList.toggle("is-complete", state === "Abgeschlossen");
+      row.classList.toggle("is-skipped", exercise.skipped);
+      const open = node("button", "workout-exercise-open"); open.type = "button";
+      open.setAttribute("aria-haspopup", "dialog");
+      const action = exercise.skipped ? "Übung wieder aufnehmen" : state === "Abgeschlossen" ? "Sätze bearbeiten" : exercise.started ? "Übung fortsetzen" : "Übung ansehen";
+      open.setAttribute("aria-label", `${action}: ${exercise.name}, ${count} von ${exercise.done.length} Sätzen erledigt`);
+      const copy = node("span", "workout-list-copy");
+      copy.append(node("small", "workout-item-state", `${index + 1}. Übung · ${state}`), node("strong", "", exercise.name),
+        node("small", "", `${exercise.equipment || catalog.get(exercise.id)?.type || "Eigene Übung"} · ${exercise.done.length} × ${exercise.reps} Wdh.`),
+        node("span", "workout-row-progress", `${count} von ${exercise.done.length} Sätzen erledigt`));
+      if (exercise.started || exercise.skipped) copy.append(node("span", "workout-row-action", action + " ›"));
+      open.append(imageFor(exercise), copy);
+      open.addEventListener("click", () => openExercise(exercise.instanceId));
+      const handle = node("button", "workout-grip", "⠿"); handle.type = "button";
+      handle.setAttribute("aria-label", `${exercise.name} verschieben, Position ${index + 1} von ${journal.active.exercises.length}`);
+      handle.setAttribute("aria-describedby", "workout-order-help");
+      row.append(open, handle);
       return row;
     }));
+    const archived = journal.active.replacedExercises;
+    const history = document.querySelector("#workout-replaced-history");
+    history.replaceChildren(); history.hidden = !archived.length;
+    if (archived.length) {
+      const details = node("details", "workout-instructions");
+      details.append(node("summary", "", "Erfasste Sätze ausgetauschter Übungen"));
+      const list = node("ul", "workout-archived-list");
+      for (const exercise of archived) {
+        const values = exercise.done.flatMap((done, index) => done ? [`${exercise.weights[index] || 0} kg × ${exercise.setReps[index]}`] : []);
+        const item = node("li"); item.append(node("strong", "", exercise.name), node("p", "planner-note", values.join(" · ")));
+        list.append(item);
+      }
+      details.append(list); history.append(details);
+    }
+  }
+
+  function renderSummary() {
+    const active = journal.active, totals = workoutState.summary(active);
+    document.querySelector("#workout-summary-totals").replaceChildren(...[
+      ["Aktive Dauer", formatDuration(totals.durationMs)], ["Übungen vollständig", `${totals.completedExercises} / ${active.exercises.length}`], ["Sätze absolviert", `${totals.totalSets} / ${totals.plannedSets}`],
+    ].map(([label, value]) => { const item = node("div"); item.append(node("dt", "", label), node("dd", "", value)); return item; }));
+    document.querySelector("#workout-summary-exercises").replaceChildren(...[...active.exercises, ...active.replacedExercises].map((exercise) => {
+      const row = node("li");
+      const entry = node(exercise.archived ? "div" : "button", "workout-summary-exercise");
+      const count = exercise.done.filter(Boolean).length;
+      entry.append(node("strong", "", exercise.name), node("small", "", exercise.archived ? `${count} Sätze erfasst · Übung ausgetauscht` : `${count} / ${exercise.done.length} Sätze${exercise.skipped ? " · Rest übersprungen" : ""} · Bearbeiten ›`));
+      if (!exercise.archived) { entry.type = "button"; entry.dataset.workoutExercise = exercise.instanceId; entry.addEventListener("click", () => openExercise(exercise.instanceId)); }
+      row.append(entry); return row;
+    }));
     const missing = totals.openSets + totals.skippedSets;
-    document.querySelector("#workout-unfinished").textContent = !totals.totalSets
-      ? "Noch kein Satz erledigt. Erfasse mindestens einen Satz, um diese Einheit zu speichern."
-      : missing ? `${totals.openSets} offene und ${totals.skippedSets} übersprungene Sätze. Nur die ${totals.totalSets} abgehakten Sätze werden in den Statistiken gezählt.`
-        : "Alle geplanten Sätze erledigt. Du kannst deine Einheit jetzt speichern.";
+    document.querySelector("#workout-unfinished").textContent = !totals.totalSets ? "Noch kein Satz erledigt. Erfasse mindestens einen Satz, um diese Einheit zu speichern."
+      : missing ? `${totals.openSets} offene und ${totals.skippedSets} übersprungene Sätze. Nur die ${totals.totalSets} abgehakten Sätze werden in den Statistiken gezählt.` : "Alle geplanten Sätze erledigt. Du kannst deine Einheit jetzt speichern.";
     document.querySelector("#workout-confirm-label").hidden = !missing || !totals.totalSets;
     incomplete.checked = false;
   }
 
   function renderWorkout() {
-    const active = journal.active;
-    if (!active) return;
-    workoutTitle.textContent = active.name;
-    document.querySelector("#workout-scheduled-date").textContent = "Training für " + fullDate.format(new Date(active.date + "T12:00:00"));
-    const reviewing = active.stage === "summary";
-    exerciseStage.hidden = reviewing;
+    const active = journal?.active, pending = pendingChange();
+    if (!active && !pending) return;
+    const record = active ?? pending;
+    workoutTitle.textContent = record.name;
+    document.querySelector("#workout-scheduled-date").textContent = "Training für " + fullDate.format(new Date(record.date + "T12:00:00"));
+    const reviewing = active?.stage === "summary";
+    exerciseStage.hidden = !active || reviewing;
     summaryStage.hidden = !reviewing;
-    pauseButton.hidden = reviewing;
-    pauseButton.textContent = active.pausedAt != null ? "Fortsetzen" : "Pausieren";
-    pauseButton.setAttribute("aria-pressed", String(active.pausedAt != null));
-    document.querySelector("#workout-paused").hidden = active.pausedAt == null || reviewing;
-    if (reviewing) {
-      workoutExercises.replaceChildren();
-      renderSummary();
+    planStage.hidden = Boolean(active) || !pending;
+    pauseButton.hidden = !active || reviewing;
+    pauseButton.textContent = active?.pausedAt != null ? "Fortsetzen" : "Pausieren";
+    pauseButton.setAttribute("aria-pressed", String(active?.pausedAt != null));
+    document.querySelector("#workout-paused").hidden = !active || active.pausedAt == null || reviewing;
+    document.querySelector("#strength-discard").hidden = !active;
+    if (active) {
+      if (reviewing) renderSummary(); else renderList();
       updateWorkoutProgress();
-      return;
+    } else {
+      document.querySelector("#workout-plan-change-list").replaceChildren(...pending.changes.map((text) => node("li", "", text)));
+      document.querySelector("#workout-apply-plan").disabled = applying;
+      document.querySelector("#workout-keep-session").disabled = applying;
+      workoutStatus.textContent = "Dein Training ist gespeichert. Entscheide, ob dein Plan angepasst werden soll.";
+      renderTimers();
     }
-    const index = active.exerciseIndex;
-    const exercise = active.exercises[index];
-    const source = catalog.get(exercise.id);
-    const card = document.createElement("section");
-    card.className = "workout-exercise-card";
-    const hero = document.createElement("div"); hero.className = "workout-exercise-hero";
-    if (source) {
-      const image = document.createElement("span");
-      image.className = "exercise-preview workout-exercise-image";
-      image.setAttribute("aria-hidden", "true");
-      image.append(exerciseIllustrations.create(source));
-      hero.append(image);
+  }
+
+  function closeExercise() {
+    if (sheet.open) sheet.close();
+    if (journal?.active) { renderList(); updateWorkoutProgress(); }
+    const button = [...workoutExercises.children].find((row) => row.dataset.instanceId === sheetId)?.querySelector(".workout-exercise-open");
+    button?.focus({ preventScroll: true });
+  }
+  function openExercise(id) {
+    if (!journal?.active?.exercises.some(({ instanceId }) => instanceId === id)) return;
+    if (journal.active.stage === "summary") {
+      const next = workoutState.resume(journal.active); next.stage = "overview";
+      if (!saveActive(next)) return;
     }
-    const copy = document.createElement("div");
-    const title = document.createElement("h3");
-    title.id = "workout-exercise-title"; title.tabIndex = -1; title.textContent = exercise.name;
-    const equipment = document.createElement("p"); equipment.className = "planner-note";
-    equipment.textContent = source?.type || exercise.equipment || "Eigene Übung";
-    const planned = document.createElement("p"); planned.className = "workout-prescription";
-    planned.textContent = `Vorgabe: ${exercise.done.length} × ${exercise.reps} Wiederholungen`;
-    copy.append(title, equipment, planned); hero.append(copy); card.append(hero);
-    if (source?.steps?.length) {
-      const instructions = document.createElement("details"); instructions.className = "workout-instructions";
-      const label = document.createElement("summary"); label.textContent = "Ausführung ansehen";
-      const gear = document.createElement("p"); gear.textContent = source.gear;
-      const steps = document.createElement("ol");
-      steps.replaceChildren(...source.steps.map((text) => { const li = document.createElement("li"); li.textContent = text; return li; }));
-      instructions.append(label, gear, steps); card.append(instructions);
+    sheetId = id; sheetView = currentExercise().started ? "sets" : "preview";
+    candidate = null; renderWorkout(); renderExercise(); sheet.showModal(); sheet.scrollTop = 0;
+  }
+
+  function renderTargets(exercise) {
+    const form = node("form", "workout-target-form"); form.id = "workout-target-form";
+    for (const [name, label, value, max] of [["sets", "Geplante Sätze", exercise.done.length, 10], ["reps", "Zielwiederholungen", exercise.reps, 100]]) {
+      const field = node("label", "plan-editor-label", label);
+      const input = node("input"); input.name = name; input.type = "number"; input.inputMode = "numeric";
+      input.min = 1; input.max = max; input.step = 1; input.required = true; input.value = value;
+      field.append(input); form.append(field);
     }
-    if (exercise.skipped) {
-      const note = document.createElement("p"); note.className = "workout-notice";
-      note.textContent = "Offene Sätze übersprungen. Du kannst diese Übung wieder aufnehmen.";
-      card.append(note);
-    }
-    const fieldset = document.createElement("fieldset"); fieldset.className = "workout-sets";
-    fieldset.disabled = active.pausedAt != null || exercise.skipped;
-    const legend = document.createElement("legend"); legend.textContent = "Deine Sätze";
-    const note = document.createElement("p"); note.className = "planner-note";
-    note.textContent = "Tatsächliche Werte eintragen und abhaken. Gewicht ohne Zusatzlast: 0 kg.";
-    const boxes = document.createElement("div"); boxes.className = "workout-set-grid";
-    const labels = document.createElement("div"); labels.className = "workout-set-labels";
-    for (const text of ["Satz", "kg", "Wdh.", "Fertig"]) {
-      const label = document.createElement("span"); label.textContent = text; labels.append(label);
-    }
+    const apply = node("button", "plan-button", "Vorgaben übernehmen"); apply.type = "submit"; form.append(apply);
+    form.append(node("p", "planner-note workout-target-note", "Entfernte offene Sätze verlieren ihre Eingaben. Erledigte Sätze bleiben erhalten."));
+    form.addEventListener("submit", (event) => {
+      event.preventDefault(); if (!form.reportValidity() || !currentExercise()) return;
+      try {
+        const next = workoutState.resize(journal.active, exercise.instanceId, form.elements.sets.valueAsNumber, form.elements.reps.valueAsNumber);
+        if (saveActive(next)) { renderWorkout(); renderExercise(); sheetStatus.textContent = "Vorgaben für diese Einheit gespeichert. Tatsächliche Werte bleiben erhalten."; }
+      } catch (error) { sheetStatus.textContent = error.message; }
+    });
+    return form;
+  }
+
+  function renderSets(exercise) {
+    const fieldset = node("fieldset", "workout-sets"); fieldset.disabled = journal.active.pausedAt != null || exercise.skipped;
+    fieldset.append(node("legend", "", "Tatsächlich absolviert"), node("p", "planner-note", "Gewicht ohne Zusatzlast: 0 kg. Werte eintragen und erledigte Sätze abhaken."));
+    const boxes = node("div", "workout-set-grid"), labels = node("div", "workout-set-labels");
+    for (const text of ["Satz", "kg", "Wdh.", "Fertig"]) labels.append(node("span", "", text));
     boxes.append(labels);
     exercise.done.forEach((checked, set) => {
-      const row = document.createElement("div"); row.className = "workout-set-row";
-      const number = document.createElement("span"); number.textContent = set + 1; row.append(number);
-      for (const [field, label, min, max, step, value] of [
-        ["weights", "Gewicht in kg", 0, 2000, "any", exercise.weights[set]],
-        ["setReps", "Wiederholungen", 1, 1000, "1", exercise.setReps[set]],
-      ]) {
-        const input = document.createElement("input");
-        input.type = "number"; input.inputMode = field === "weights" ? "decimal" : "numeric";
-        input.min = min; input.max = max; input.step = step; input.required = true;
-        input.value = value; input.placeholder = field === "weights" ? "kg" : String(exercise.reps);
-        input.dataset.field = field;
-        input.setAttribute("aria-label", label + ", Satz " + (set + 1) + ", " + exercise.name);
+      const row = node("div", "workout-set-row"); row.append(node("span", "", set + 1));
+      for (const [field, label, min, max, step] of [["weights", "Gewicht in kg", 0, 2000, "any"], ["setReps", "Wiederholungen", 1, 1000, "1"]]) {
+        const input = node("input"); input.type = "number"; input.inputMode = field === "weights" ? "decimal" : "numeric";
+        input.min = min; input.max = max; input.step = step; input.required = true; input.value = exercise[field][set]; input.dataset.field = field;
+        input.setAttribute("aria-label", `${label}, Satz ${set + 1}, ${exercise.name}`);
         input.addEventListener("input", () => {
-          if (!journal.active || journal.active.pausedAt != null) return;
-          const next = structuredClone(journal.active);
-          next.exercises[index][field][set] = input.value === "" ? "" : input.valueAsNumber;
-          // An edited, invalid value cannot remain a completed set.
-          if (!input.validity.valid) {
-            next.exercises[index].done[set] = false;
-            row.querySelector('[type="checkbox"]').checked = false;
-          }
+          if (!currentExercise() || journal.active.pausedAt != null) return;
+          const next = structuredClone(journal.active), entry = next.exercises.find(({ instanceId }) => instanceId === exercise.instanceId);
+          if (!entry || set >= entry.done.length) return;
+          entry[field][set] = input.value === "" ? "" : input.valueAsNumber;
+          if (field === "setReps") entry.touchedReps[set] = true;
+          if (!input.validity.valid) { entry.done[set] = false; row.querySelector('[type="checkbox"]').checked = false; }
           if (saveActive(next)) updateWorkoutProgress();
         });
         row.append(input);
       }
-      const box = document.createElement("input"); box.type = "checkbox"; box.checked = checked;
-      box.setAttribute("aria-label", "Satz " + (set + 1) + " für " + exercise.name + " abgeschlossen");
+      const box = node("input"); box.type = "checkbox"; box.checked = checked;
+      box.setAttribute("aria-label", `Satz ${set + 1} für ${exercise.name} abgeschlossen`);
       box.addEventListener("change", () => {
-        if (!journal.active || journal.active.pausedAt != null) return;
-        if (box.checked && [...row.querySelectorAll('input[type="number"]')].some((input) => !input.reportValidity())) {
-          box.checked = journal.active.exercises[index].done[set]; return;
-        }
-        const next = structuredClone(journal.active);
-        next.exercises[index].done[set] = box.checked;
-        if (box.checked) next.restUntil = Date.now() + 3 * 60_000;
-        if (saveActive(next)) updateWorkoutProgress();
-        else box.checked = checked;
+        if (!currentExercise() || journal.active.pausedAt != null) return;
+        if (box.checked && [...row.querySelectorAll('[type="number"]')].some((input) => !input.reportValidity())) { box.checked = currentExercise().done[set]; return; }
+        const next = structuredClone(journal.active), entry = next.exercises.find(({ instanceId }) => instanceId === exercise.instanceId);
+        if (!entry || set >= entry.done.length) return;
+        entry.done[set] = box.checked;
+        if (box.checked) { entry.touchedReps[set] = true; next.restUntil = Date.now() + 180000; }
+        if (saveActive(next)) updateWorkoutProgress(); else box.checked = checked;
       });
       row.append(box); boxes.append(row);
     });
-    fieldset.append(legend, note, boxes); card.append(fieldset);
-    workoutExercises.replaceChildren(card);
-    document.querySelector("#workout-previous").disabled = index === 0;
-    document.querySelector("#workout-next").textContent = index === active.exercises.length - 1 ? "Zusammenfassung" : "Nächste Übung";
-    const skip = document.querySelector("#workout-skip");
-    skip.textContent = exercise.skipped ? "Übung wieder aufnehmen" : exercise.done.some(Boolean) ? "Offene Sätze überspringen" : "Übung überspringen";
-    skip.disabled = active.pausedAt != null || exercise.done.every(Boolean);
-    updateWorkoutProgress();
+    fieldset.append(boxes); return fieldset;
   }
 
-  function navigateExercise(index) {
-    if (!journal?.active) return;
-    const next = journal.active.stage === "summary" ? workoutState.resume(journal.active) : structuredClone(journal.active);
-    next.stage = "exercise";
-    next.exerciseIndex = Math.max(0, Math.min(index, next.exercises.length - 1));
-    if (!saveActive(next)) return;
-    renderWorkout(); dialog.scrollTop = 0;
-    document.querySelector("#workout-exercise-title").focus({ preventScroll: true });
+  function renderExercise() {
+    const exercise = currentExercise();
+    if (!exercise) { if (sheet.open) sheet.close(); return; }
+    document.querySelector("#workout-exercise-dialog-title").textContent = sheetView === "replace" || sheetView === "confirm" ? "Übung austauschen" : exercise.name;
+    document.querySelector("#workout-exercise-context").textContent = journal.active.name + " · " + shortDate.format(new Date(journal.active.date + "T12:00:00"));
+    sheetStatus.textContent = ""; sheetContent.replaceChildren();
+    if (sheetView === "replace") { renderReplacement(exercise); renderTimers(); return; }
+    if (sheetView === "confirm") {
+      const count = exercise.done.filter(Boolean).length;
+      sheetContent.append(imageFor(candidate, true), node("h3", "", candidate.name), node("p", "planner-note", candidate.type),
+        node("p", "workout-notice", `${count ? `${count} bereits absolvierte Sätze von „${exercise.name}“ bleiben im Trainingsprotokoll. ` : ""}${exercise.done.length - count} offene Sätze und deren Eingaben werden ersetzt. Die neue Übung startet mit ${exercise.done.length} leeren Sätzen und ${exercise.reps} Zielwiederholungen. Es werden keine tatsächlichen Werte übertragen.`));
+      const confirm = node("button", "plan-button primary", "Übung jetzt austauschen"); confirm.type = "button"; confirm.id = "workout-swap-confirm";
+      confirm.addEventListener("click", () => {
+        if (!currentExercise() || !candidate) return;
+        const id = crypto.randomUUID();
+        const next = workoutState.replace(journal.active, sheetId, { id: candidate.id, name: candidate.name, equipment: candidate.type, muscles: primaryMuscles(candidate) }, id);
+        if (saveActive(next)) { sheetId = id; sheetView = "preview"; candidate = null; renderWorkout(); renderExercise(); sheet.scrollTop = 0; }
+      });
+      const cancel = node("button", "plan-button", "Zurück zur Auswahl"); cancel.type = "button";
+      cancel.addEventListener("click", () => { candidate = null; sheetView = "replace"; renderExercise(); });
+      const actions = node("div", "planner-actions"); actions.append(confirm, cancel); sheetContent.append(actions); renderTimers(); return;
+    }
+    const source = catalog.get(exercise.id), hero = node("div", "workout-exercise-hero"), copy = node("div");
+    copy.append(node("p", "planner-note", exercise.equipment || source?.type || "Eigene Übung"), node("p", "workout-prescription", `Vorgabe: ${exercise.done.length} × ${exercise.reps} Wiederholungen`));
+    hero.append(imageFor(exercise, true), copy); sheetContent.append(hero);
+    if (source?.steps?.length) {
+      const details = node("details", "workout-instructions"), steps = node("ol");
+      details.append(node("summary", "", "Ausführung ansehen"), node("p", "", source.gear));
+      steps.append(...source.steps.map((text) => node("li", "", text))); details.append(steps); sheetContent.append(details);
+    }
+    if (sheetView === "sets") {
+      sheetContent.append(renderSets(exercise));
+      const targets = node("details", "workout-instructions"); targets.append(node("summary", "", "Satzanzahl und Zielwiederholungen anpassen"), renderTargets(exercise)); sheetContent.append(targets);
+      const done = node("button", "plan-button primary workout-return", "Zur Trainingsübersicht"); done.type = "button"; done.id = "workout-exercise-done";
+      done.addEventListener("click", closeExercise); sheetContent.append(done);
+    } else {
+      sheetContent.append(renderTargets(exercise));
+      const startExercise = node("button", "plan-button primary workout-return", exercise.skipped ? "Übung wieder aufnehmen" : exercise.started ? "Übung fortsetzen" : "Übung starten");
+      startExercise.type = "button"; startExercise.id = "workout-exercise-start"; startExercise.disabled = journal.active.pausedAt != null;
+      startExercise.addEventListener("click", () => {
+        if (!currentExercise()) return;
+        const next = structuredClone(journal.active), entry = next.exercises.find(({ instanceId }) => instanceId === sheetId);
+        entry.started = true; entry.skipped = false;
+        if (saveActive(next)) { sheetView = "sets"; renderWorkout(); renderExercise(); sheet.scrollTop = 0; }
+      });
+      sheetContent.append(startExercise);
+    }
+    const position = node("label", "plan-editor-label workout-position", "Position im Training");
+    const select = node("select"); select.id = "workout-exercise-position";
+    select.replaceChildren(...journal.active.exercises.map((_, index) => new Option(`${index + 1}. Position`, String(index))));
+    select.value = journal.active.exercises.indexOf(exercise);
+    select.addEventListener("change", () => { moveExercise(exercise.instanceId, Number(select.value)); renderExercise(); });
+    position.append(select); sheetContent.append(position);
+    const swap = node("button", "plan-button", "Übung austauschen"); swap.type = "button"; swap.id = "workout-swap";
+    swap.addEventListener("click", () => { replaceFilters = { query: "", group: source?.group ?? "", type: "" }; sheetView = "replace"; renderExercise(); sheet.scrollTop = 0; });
+    const skip = node("button", "text-button", exercise.skipped ? "Übung wieder aufnehmen" : exercise.done.some(Boolean) ? "Offene Sätze überspringen" : "Übung überspringen");
+    skip.type = "button"; skip.id = "workout-skip"; skip.disabled = exercise.done.every(Boolean);
+    skip.addEventListener("click", () => {
+      const next = structuredClone(journal.active), entry = next.exercises.find(({ instanceId }) => instanceId === sheetId);
+      if (!entry) return;
+      entry.skipped = !entry.skipped; next.restUntil = null; next.restRemaining = 0;
+      if (saveActive(next)) { renderWorkout(); closeExercise(); }
+    });
+    const actions = node("div", "planner-actions"); actions.append(swap, skip); sheetContent.append(actions);
+    renderTimers();
   }
+
+  function renderReplacement(exercise) {
+    sheetContent.append(node("p", "planner-note", "Ersatz für „" + exercise.name + "“. Die Auswahl wird erst nach deiner Bestätigung übernommen."));
+    const controls = node("div", "library-controls workout-replacement-controls");
+    const searchLabel = node("label", "full-row", "Übung suchen"), search = node("input"); search.type = "search"; search.id = "workout-replace-search"; search.value = replaceFilters.query;
+    searchLabel.append(search); controls.append(searchLabel);
+    for (const [field, label, values] of [["group", "Muskelgruppe", catalogSearch.groups], ["type", "Equipment", catalogSearch.types]]) {
+      const wrapper = node("label", "", label), select = node("select"); select.id = "workout-replace-" + field;
+      select.replaceChildren(new Option("Alle", ""), ...values.map((value) => new Option(value, value))); select.value = replaceFilters[field];
+      select.addEventListener("change", () => { replaceFilters[field] = select.value; update(); }); wrapper.append(select); controls.append(wrapper);
+    }
+    const count = node("p", "planner-note"), results = node("div", "workout-replacement-results"); results.id = "workout-replace-results";
+    const cancel = node("button", "plan-button", "Austausch abbrechen"); cancel.type = "button"; cancel.id = "workout-replace-cancel";
+    cancel.addEventListener("click", () => { sheetView = exercise.started ? "sets" : "preview"; renderExercise(); sheet.scrollTop = 0; });
+    function update() {
+      const matches = catalogSearch.find(replaceFilters.query, replaceFilters.group, replaceFilters.type).filter(({ id }) => id !== exercise.id);
+      count.textContent = `${matches.length} passende Übungen`; results.replaceChildren();
+      if (!matches.length) results.append(node("p", "workout-notice", "Keine passende Übung gefunden. Ändere Suche oder Filter."));
+      for (const group of catalogSearch.groups) {
+        const entries = matches.filter((entry) => entry.group === group); if (!entries.length) continue;
+        const list = node("ul", "exercise-grid"); results.append(node("h3", "", group), list);
+        for (const entry of entries) {
+          const item = document.querySelector("#exercise-template").content.cloneNode(true), button = item.querySelector("button");
+          button.removeAttribute("aria-haspopup"); button.dataset.replacementId = entry.id; button.prepend(imageFor(entry));
+          item.querySelector(".exercise-name").textContent = entry.name; item.querySelector(".exercise-meta").textContent = entry.type;
+          item.querySelector(".arrow use").setAttribute("href", "#icon-swap");
+          button.addEventListener("click", () => { candidate = entry; sheetView = "confirm"; renderExercise(); sheet.scrollTop = 0; }); list.append(item);
+        }
+      }
+    }
+    search.addEventListener("input", () => { replaceFilters.query = search.value; update(); });
+    sheetContent.append(controls, count, cancel, results); update();
+  }
+
+  function moveExercise(id, position, focus = false) {
+    if (!journal?.active) return;
+    if (!saveActive(workoutState.move(journal.active, id, position))) return;
+    renderWorkout(); workoutStatus.textContent = "Reihenfolge für diese Einheit gespeichert.";
+    if (focus) [...workoutExercises.children].find((row) => row.dataset.instanceId === id)?.querySelector(".workout-grip").focus({ preventScroll: true });
+  }
+  function positionDrag() {
+    if (!drag) return;
+    const origin = drag.bounds[drag.from], delta = drag.y - drag.startY + dialog.scrollTop - drag.scrollTop;
+    const offset = Math.max(drag.bounds[0].top - origin.top, Math.min(delta, drag.bounds.at(-1).bottom - origin.bottom));
+    const center = origin.top + origin.height / 2 + offset;
+    let target = drag.from;
+    while (target < drag.rows.length - 1 && center + .5 >= drag.bounds[target + 1].top + drag.bounds[target + 1].height / 2) target++;
+    while (target > 0 && center - .5 <= drag.bounds[target - 1].top + drag.bounds[target - 1].height / 2) target--;
+    drag.target = target;
+    drag.rows.forEach((row, index) => {
+      row.style.transform = index === drag.from ? `translateY(${offset}px)` : drag.from < index && index <= target ? `translateY(-${origin.height + 12}px)` : target <= index && index < drag.from ? `translateY(${origin.height + 12}px)` : "";
+    });
+  }
+  function scrollDrag() {
+    if (!drag) return;
+    positionDrag();
+    const top = document.querySelector(".workout-toolbar").getBoundingClientRect().bottom + 40;
+    if (drag.y < top) dialog.scrollBy(0, -12);
+    if (drag.y > innerHeight - 64) dialog.scrollBy(0, 12);
+    drag.frame = requestAnimationFrame(scrollDrag);
+  }
+  function finishDrag(commit = false) {
+    if (!drag) return;
+    const previous = drag; drag = null; cancelAnimationFrame(previous.frame);
+    previous.rows.forEach((row) => { row.style.transform = ""; row.classList.remove("is-dragging"); });
+    if (previous.handle.hasPointerCapture(previous.pointerId)) previous.handle.releasePointerCapture(previous.pointerId);
+    if (commit && previous.from !== previous.target) moveExercise(previous.id, previous.target, true);
+  }
+  workoutExercises.addEventListener("pointerdown", (event) => {
+    const handle = event.target.closest(".workout-grip");
+    if (!handle || drag || !event.isPrimary || event.button !== 0 || !journal?.active) return;
+    event.preventDefault(); handle.focus({ preventScroll: true }); handle.setPointerCapture(event.pointerId);
+    const row = handle.closest(".workout-list-item"), rows = [...workoutExercises.children];
+    drag = { handle, id: row.dataset.instanceId, rows, from: rows.indexOf(row), target: rows.indexOf(row), bounds: rows.map((entry) => entry.getBoundingClientRect()), scrollTop: dialog.scrollTop, pointerId: event.pointerId, startY: event.clientY, y: event.clientY, frame: 0 };
+  });
+  workoutExercises.addEventListener("pointermove", (event) => {
+    if (drag?.pointerId !== event.pointerId) return;
+    drag.y = event.clientY;
+    if (!drag.frame && Math.abs(drag.y - drag.startY) > 5) { drag.rows[drag.from].classList.add("is-dragging"); scrollDrag(); }
+  });
+  workoutExercises.addEventListener("pointerup", (event) => { if (drag?.pointerId === event.pointerId) { drag.y = event.clientY; positionDrag(); finishDrag(true); } });
+  for (const name of ["pointercancel", "lostpointercapture"]) workoutExercises.addEventListener(name, (event) => { if (drag?.pointerId === event.pointerId) finishDrag(); });
+  workoutExercises.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && drag) { event.preventDefault(); finishDrag(); return; }
+    const handle = event.target.closest(".workout-grip");
+    if (!handle || !["ArrowUp", "ArrowDown"].includes(event.key) || !journal?.active) return;
+    event.preventDefault(); const id = handle.closest("li").dataset.instanceId;
+    const from = journal.active.exercises.findIndex((entry) => entry.instanceId === id);
+    moveExercise(id, from + (event.key === "ArrowUp" ? -1 : 1), true);
+  });
 
   function showSummary() {
     if (!journal?.active) return;
-    const next = workoutState.pause(journal.active);
-    next.stage = "summary";
+    const next = workoutState.pause(journal.active); next.stage = "summary";
     if (!saveActive(next)) return;
-    renderWorkout(); dialog.scrollTop = 0;
+    if (sheet.open) sheet.close(); renderWorkout(); dialog.scrollTop = 0;
     document.querySelector("#workout-summary-title").focus({ preventScroll: true });
   }
-
   function pauseAndLeave() {
     if (journal?.active && !saveActive(workoutState.pause(journal.active))) return;
-    dialog.close(); render();
+    finishDrag(); if (sheet.open) sheet.close(); dialog.close(); render();
   }
-
   function openWorkout(resume = false) {
     if (!storageKey) return;
     journal = readJournal();
-    if (resume && !journal.active) { render(); return; }
+    if (resume && !journal.active && !pendingChange()) { render(); return; }
     if (journal.active && !resume && !selectedActiveWorkout()) return;
     status.textContent = "";
-    if (!journal.active) {
-      const session = selectedSession();
-      if (!session?.exercises.length) return;
-      const entries = exercisesForToday(session);
-      if (!entries.length) { status.textContent = "Wähle Equipment aus, für das Übungen verfügbar sind."; return; }
-      const active = workoutState.normalize({
-        id: crypto.randomUUID(), date: dateKey(selectedDate), startedAt: Date.now(),
-        sourcePlanId: document.querySelector("#account-plans").value,
-        sourceSession: JSON.stringify(session), name: session.name,
-        exercises: entries.map((entry) => {
-          const exercise = catalog.get(entry.id);
-          return { id: entry.id, name: exercise?.name ?? entry.name, equipment: exercise?.type ?? entry.equipment,
-            muscles: primaryMuscles(exercise), reps: entry.reps, done: Array(entry.sets).fill(false),
-            weights: Array(entry.sets).fill(""), setReps: Array(entry.sets).fill(entry.reps) };
-        }),
+    if (!journal.active && !pendingChange()) {
+      const session = selectedSession(); if (!session?.exercises.length) return;
+      const source = planAccess?.snapshot();
+      if (!source) { status.textContent = "Bitte warte, bis dein Trainingsplan im Konto gespeichert ist."; return; }
+      const entries = exercisesForToday(session); if (!entries.length) { status.textContent = "Wähle Equipment aus, für das Übungen verfügbar sind."; return; }
+      const active = workoutState.normalize({ id: crypto.randomUUID(), date: dateKey(selectedDate), startedAt: Date.now(), stage: "overview",
+        sourcePlanId: source.id, sourceVersion: source.version, sourceSessionIndex: Number(sessionSelect.value), sourceSession: JSON.stringify(session), name: session.name,
+        exercises: entries.map((entry) => { const exercise = catalog.get(entry.id); return {
+          instanceId: crypto.randomUUID(), slotId: `source-${entry.sourceIndex}`, id: entry.id, name: exercise?.name ?? entry.name, equipment: exercise?.type ?? entry.equipment,
+          muscles: primaryMuscles(exercise), reps: entry.reps, done: Array(entry.sets).fill(false), weights: Array(entry.sets).fill(""), setReps: Array(entry.sets).fill(entry.reps),
+        }; }),
       });
       if (!writeJournal({ ...journal, active }, status)) return;
-    } else if (journal.active.stage !== "summary" && !saveActive(workoutState.resume(journal.active))) return;
+    } else if (journal.active && journal.active.stage !== "summary") {
+      const next = workoutState.resume(journal.active); next.stage = "overview"; if (!saveActive(next)) return;
+    }
     renderWorkout();
-    if (optionsDialog.open) optionsDialog.close();
-    if (activityDialog.open) activityDialog.close();
-    dialog.showModal(); dialog.scrollTop = 0; render(); renderTimers();
+    if (optionsDialog.open) optionsDialog.close(); if (activityDialog.open) activityDialog.close();
+    if (!dialog.open) dialog.showModal(); dialog.scrollTop = 0; render(); renderTimers();
+  }
+  function togglePause() {
+    if (!journal?.active) return;
+    const next = journal.active.pausedAt != null ? workoutState.resume(journal.active) : workoutState.pause(journal.active);
+    if (saveActive(next)) { renderWorkout(); if (sheet.open) renderExercise(); }
   }
   start.addEventListener("click", () => openWorkout());
   activeWidget.addEventListener("click", () => openWorkout(true));
   document.querySelector("#workout-leave").addEventListener("click", pauseAndLeave);
   dialog.addEventListener("cancel", (event) => { event.preventDefault(); pauseAndLeave(); });
-  pauseButton.addEventListener("click", () => {
-    if (!journal?.active) return;
-    const next = journal.active.pausedAt != null ? workoutState.resume(journal.active) : workoutState.pause(journal.active);
-    if (saveActive(next)) renderWorkout();
-  });
-  document.querySelector("#workout-previous").addEventListener("click", () => navigateExercise(journal.active.exerciseIndex - 1));
-  document.querySelector("#workout-next").addEventListener("click", () => {
-    if (journal.active.exerciseIndex === journal.active.exercises.length - 1) showSummary();
-    else navigateExercise(journal.active.exerciseIndex + 1);
-  });
+  sheet.addEventListener("cancel", (event) => { event.preventDefault(); closeExercise(); });
+  document.querySelector("#workout-exercise-close").addEventListener("click", closeExercise);
+  pauseButton.addEventListener("click", togglePause);
+  document.querySelector("#workout-exercise-pause").addEventListener("click", togglePause);
   document.querySelector("#workout-review").addEventListener("click", showSummary);
-  document.querySelector("#workout-back").addEventListener("click", () => navigateExercise(journal.active.exerciseIndex));
-  document.querySelector("#workout-skip").addEventListener("click", () => {
-    const next = structuredClone(journal.active);
-    const exercise = next.exercises[next.exerciseIndex];
-    const restoring = exercise.skipped;
-    exercise.skipped = !restoring;
-    next.restUntil = null;
-    if (!saveActive(next)) return;
-    if (restoring) renderWorkout();
-    else if (next.exerciseIndex === next.exercises.length - 1) showSummary();
-    else navigateExercise(next.exerciseIndex + 1);
+  document.querySelector("#workout-back").addEventListener("click", () => {
+    if (!journal?.active) return;
+    const next = workoutState.resume(journal.active); next.stage = "overview";
+    if (saveActive(next)) { renderWorkout(); dialog.scrollTop = 0; }
   });
-  incomplete.addEventListener("change", updateWorkoutProgress);
+  incomplete.addEventListener("change", () => updateWorkoutProgress());
 
   finish.addEventListener("click", async () => {
     if (finishing || !journal?.active || journal.active.stage !== "summary" || finish.disabled) return;
-    const id = journal.active.id;
-    const key = storageKey;
-    const epoch = accountEpoch;
+    const id = journal.active.id, key = storageKey, epoch = accountEpoch;
     finishing = true; updateWorkoutProgress();
     const commit = () => {
       if (storageKey !== key || accountEpoch !== epoch) return;
       journal = readJournal();
-      if (!journal.active || journal.active.id !== id) { dialog.close(); render(); return; }
+      if (!journal.active || journal.active.id !== id) { if (pendingChange()) renderWorkout(); else dialog.close(); render(); return; }
       if (journal.active.stage !== "summary") { renderWorkout(); return; }
       const totals = workoutState.summary(journal.active);
       if (!totals.totalSets || (totals.totalSets < totals.plannedSets && !incomplete.checked)) { renderWorkout(); return; }
-      const next = workoutState.complete(journal, id);
-      if (!writeJournal(next, workoutStatus)) return;
-      dialog.close(); status.textContent = "Training gespeichert."; render();
+      if (!writeJournal(workoutState.complete(journal, id), workoutStatus)) return;
+      if (pendingChange()) { renderWorkout(); dialog.scrollTop = 0; document.querySelector("#workout-plan-changes-title").focus({ preventScroll: true }); }
+      else { dialog.close(); status.textContent = "Training gespeichert."; }
+      render();
     };
-    try {
-      // Serialize concurrent finish clicks across tabs on supported browsers.
-      if (navigator.locks) await navigator.locks.request(`fitness-workout:${key}`, commit);
-      else commit();
-    } catch {
-      if (storageKey === key && accountEpoch === epoch) workoutStatus.textContent = "Speichern fehlgeschlagen. Deine Einheit bleibt fortsetzbar.";
-    } finally {
-      if (accountEpoch === epoch) { finishing = false; if (journal?.active) updateWorkoutProgress(false); }
-    }
+    try { if (navigator.locks) await navigator.locks.request(`fitness-workout:${key}`, commit); else commit(); }
+    catch { if (accountEpoch === epoch) workoutStatus.textContent = "Speichern fehlgeschlagen. Deine Einheit bleibt fortsetzbar."; }
+    finally { if (accountEpoch === epoch) { finishing = false; if (journal?.active) updateWorkoutProgress(false); } }
   });
 
+  async function settlePlanChange(apply) {
+    if (applying || !pendingChange()) return;
+    const pending = structuredClone(pendingChange()), key = storageKey, epoch = accountEpoch;
+    applying = true; renderWorkout();
+    const commit = async () => {
+      if (accountEpoch !== epoch || storageKey !== key) return;
+      journal = readJournal();
+      if (!journal.pendingPlanChanges?.some(({ workoutId }) => workoutId === pending.workoutId)) { if (!journal.active) dialog.close(); render(); return; }
+      if (apply) await planAccess.apply(pending);
+      if (accountEpoch !== epoch || storageKey !== key) return;
+      journal = readJournal();
+      const next = { ...journal, pendingPlanChanges: (journal.pendingPlanChanges ?? []).filter(({ workoutId }) => workoutId !== pending.workoutId) };
+      if (!writeJournal(next, workoutStatus)) return;
+      if (journal.active || pendingChange()) renderWorkout(); else dialog.close();
+      status.textContent = apply ? "Training gespeichert und Plan für zukünftige Trainings aktualisiert." : "Training gespeichert. Dein Plan bleibt unverändert.";
+      render();
+    };
+    try { if (navigator.locks) await navigator.locks.request(`fitness-workout:${key}`, commit); else await commit(); }
+    catch (error) { if (accountEpoch === epoch) workoutStatus.textContent = error.message + " Deine Entscheidung bleibt für einen erneuten Versuch gespeichert."; }
+    finally {
+      if (accountEpoch === epoch) {
+        applying = false; document.querySelector("#workout-apply-plan").disabled = false; document.querySelector("#workout-keep-session").disabled = false;
+      }
+    }
+  }
+  document.querySelector("#workout-apply-plan").addEventListener("click", () => settlePlanChange(true));
+  document.querySelector("#workout-keep-session").addEventListener("click", () => settlePlanChange(false));
   document.querySelector("#strength-discard").addEventListener("click", () => {
-    if (!window.confirm("Dieses Training verwerfen?")) return;
+    if (!journal?.active || !window.confirm("Dieses Training verwerfen?")) return;
     if (!writeJournal({ ...journal, active: null }, workoutStatus)) return;
-    dialog.close(); render();
+    if (sheet.open) sheet.close(); dialog.close(); render();
   });
 
   document.addEventListener("fitness:planchange", render);
@@ -660,30 +845,50 @@ const strengthDashboard = (() => {
     renderSelectedSession();
   });
   function renderTimers() {
-    if (!journal?.active) return;
-    document.querySelector("#workout-elapsed").value = formatDuration(workoutState.elapsed(journal.active));
-    const rest = Math.max(0, Math.ceil((journal.active.pausedAt != null ? journal.active.restRemaining ?? 0 : (journal.active.restUntil ?? 0) - Date.now()) / 1000));
-    restSkip.hidden = rest === 0 || journal.active.stage === "summary";
-    document.querySelector("#workout-rest").textContent = Math.floor(rest / 60) + ":" + (rest % 60).toString().padStart(2, "0");
+    const active = journal?.active;
+    const duration = active ? workoutState.elapsed(active) : pendingChange()?.durationMs ?? 0;
+    document.querySelector("#workout-elapsed").value = formatDuration(duration);
+    document.querySelector(".workout-elapsed-mirror").value = formatDuration(duration);
+    const rest = active ? Math.max(0, Math.ceil((active.pausedAt != null ? active.restRemaining ?? 0 : (active.restUntil ?? 0) - Date.now()) / 1000)) : 0;
+    restSkip.hidden = rest === 0 || active?.stage === "summary";
+    const time = Math.floor(rest / 60) + ":" + (rest % 60).toString().padStart(2, "0");
+    document.querySelector("#workout-rest").textContent = time;
+    const mirror = document.querySelector("#workout-exercise-rest");
+    mirror.hidden = restSkip.hidden; mirror.querySelector("span").textContent = time;
+    document.querySelector("#workout-exercise-pause").textContent = active?.pausedAt != null ? "Fortsetzen" : "Pausieren";
+    document.querySelector("#workout-exercise-paused").hidden = !active || active.pausedAt == null;
   }
-  restSkip.addEventListener("click", () => {
+  function endRest() {
     if (!journal?.active) return;
     const active = { ...journal.active, restUntil: null, restRemaining: 0 };
     if (writeJournal({ ...journal, active }, workoutStatus)) renderTimers();
-  });
+  }
+  restSkip.addEventListener("click", endRest);
+  document.querySelector("#workout-exercise-rest").addEventListener("click", endRest);
+  function syncWorkoutViewport() {
+    const viewport = window.visualViewport;
+    sheet.style.setProperty("--workout-viewport-height", `${viewport?.height ?? innerHeight}px`);
+    sheet.style.setProperty("--workout-keyboard-offset", `${Math.max(0, innerHeight - (viewport?.height ?? innerHeight) - (viewport?.offsetTop ?? 0))}px`);
+  }
+  window.visualViewport?.addEventListener("resize", syncWorkoutViewport);
+  window.visualViewport?.addEventListener("scroll", syncWorkoutViewport);
+  syncWorkoutViewport();
   window.setInterval(renderTimers, 1000);
   window.addEventListener("storage", (event) => {
     if (!storageKey || (event.key !== storageKey && event.key !== null)) return;
     journal = readJournal();
     if (dialog.open) {
       if (journal.active) renderWorkout();
-      else dialog.close();
+      else if (pendingChange()) renderWorkout();
+      else { if (sheet.open) sheet.close(); dialog.close(); }
     }
+    if (sheet.open) renderExercise();
     render();
   });
 
   return {
     render,
+    setPlanAccess(access) { planAccess = access; },
     open() {
       selectedDate = new Date();
       shownDate = undefined;
@@ -691,17 +896,23 @@ const strengthDashboard = (() => {
     },
     getTrainingDates: () => journal?.workouts.map(({ date }) => date) ?? [],
     close() {
+      finishDrag();
       if (dialog.open && journal?.active) saveActive(workoutState.pause(journal.active));
-      for (const sheet of [dialog, optionsDialog, historyDialog, activityDialog]) {
+      for (const sheet of [document.querySelector("#workout-exercise-dialog"), dialog, optionsDialog, historyDialog, activityDialog]) {
         if (sheet.open) sheet.close();
       }
       shownPlan = undefined;
     },
     setAccount(id) {
+      finishDrag();
       if (storageKey && journal?.active) saveActive(workoutState.pause(journal.active));
       if (dialog.open) dialog.close();
+      if (sheet.open) sheet.close();
       accountEpoch++;
       finishing = false;
+      applying = false;
+      sheetId = undefined;
+      sheetContent.replaceChildren();
       workoutExercises.replaceChildren();
       document.querySelector("#workout-summary-exercises").replaceChildren();
       workoutStatus.textContent = "";

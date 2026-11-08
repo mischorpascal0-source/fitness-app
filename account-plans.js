@@ -195,6 +195,40 @@
     },
   };
 
+  strengthDashboard.setPlanAccess({
+    snapshot() {
+      if (!selected || busy || saving || pendingPlan) return null;
+      return { id: selected.id, version: selected.version };
+    },
+    async apply(pending) {
+      if (!account || busy || saving || pendingPlan) throw new Error("Bitte warte, bis offene Planänderungen im Konto gespeichert sind.");
+      const owner = account.id;
+      busy = true;
+      renderControls();
+      try {
+        const current = await api(`/api/plans/${pending.sourcePlanId}`);
+        if (account?.id !== owner) throw new Error("Das Konto wurde gewechselt. Öffne die Änderungen im ursprünglichen Konto erneut.");
+        const plan = workoutState.planUpdate(current, pending);
+        const updated = plan ? await api(`/api/plans/${current.id}`, "PUT", { plan, version: current.version }) : current;
+        if (account?.id !== owner) return;
+        if (selected?.id === updated.id) {
+          selected = updated;
+          trainingPlanner.setWorkspace(workspace, updated.plan);
+        }
+        const option = plans.find(({ id }) => id === updated.id);
+        if (option) option.name = updated.plan.name;
+        renderPlanSelect();
+      } catch (error) {
+        if (error.status === 404) throw new Error("Der ursprüngliche Plan wurde gelöscht. Dein Training ist bereits gespeichert. Wähle „Nur für dieses Training“.");
+        if (error.status === 409) throw new Error("Der Plan wurde inzwischen geändert. Dein Training ist gespeichert; neuere Planänderungen bleiben erhalten.");
+        throw error;
+      } finally {
+        busy = false;
+        renderControls();
+      }
+    },
+  });
+
   function renderAuthMode() {
     loginTitle.textContent = register ? "Konto erstellen" : "Anmelden";
     if (!account) document.title = `${loginTitle.textContent} · Fitness-App`;
