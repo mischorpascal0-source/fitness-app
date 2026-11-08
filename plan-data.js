@@ -12,6 +12,29 @@ const trainingPlanData = (() => {
   const weekdays = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
   const limits = { name: 100, sessions: 20, exercises: 40, sets: 10, reps: 100 };
   const sessionTime = { min: 20, max: 120, step: 5, defaultMinutes: 45, setMinutes: 1, restMinutes: 3 };
+  const repRanges = ["5-8", "8-12", "12-20"];
+  const loadModes = ["external", "bodyweight", "added", "assisted"];
+
+  function normalizeExerciseSettings(entry) {
+    const settings = {};
+    if (entry.repRange !== undefined) {
+      if (!repRanges.includes(entry.repRange)) return null;
+      settings.repRange = entry.repRange;
+    }
+    if (entry.weightStep !== undefined) {
+      if (!Number.isFinite(entry.weightStep) || entry.weightStep < .1 || entry.weightStep > 100) return null;
+      settings.weightStep = entry.weightStep;
+    }
+    if (entry.loadMode !== undefined) {
+      if (!loadModes.includes(entry.loadMode)) return null;
+      settings.loadMode = entry.loadMode;
+    }
+    if (entry.equipmentKey !== undefined) {
+      if (typeof entry.equipmentKey !== "string" || entry.equipmentKey.trim().length > 80) return null;
+      settings.equipmentKey = entry.equipmentKey.trim();
+    }
+    return settings;
+  }
 
   function estimateMinutes(sets) {
     return sets * sessionTime.setMinutes + Math.max(0, sets - 1) * sessionTime.restMinutes;
@@ -45,10 +68,16 @@ const trainingPlanData = (() => {
         if (!entry || !Number.isInteger(entry.sets) || entry.sets < 1 || entry.sets > limits.sets ||
             !Number.isInteger(entry.reps) || entry.reps < 1 || entry.reps > limits.reps) return null;
         const { id, sets, reps } = entry;
+        const settings = normalizeExerciseSettings(entry);
+        if (!settings) return null;
+        if (settings.repRange) {
+          const [min, max] = settings.repRange.split("-").map(Number);
+          if (reps < min || reps > max) return null;
+        }
         if (exerciseIds.has(id)) {
-          exercises.push({ id, sets, reps });
+          exercises.push({ id, sets, reps, ...settings });
         } else if (validName(entry.name) && (!entry.equipment || equipment.includes(entry.equipment))) {
-          exercises.push({ name: entry.name.trim(), equipment: entry.equipment || "", sets, reps });
+          exercises.push({ name: entry.name.trim(), equipment: entry.equipment || "", sets, reps, ...settings });
         } else {
           return null;
         }
@@ -62,7 +91,7 @@ const trainingPlanData = (() => {
     return { name: name.trim(), options, sessions };
   }
 
-  return { splits, goals, levels, equipment, weekdays, limits, sessionTime, estimateMinutes, normalizeOptions, normalizePlan };
+  return { splits, goals, levels, equipment, weekdays, limits, sessionTime, repRanges, loadModes, normalizeExerciseSettings, estimateMinutes, normalizeOptions, normalizePlan };
 })();
 
 if (typeof module !== "undefined") module.exports = trainingPlanData;

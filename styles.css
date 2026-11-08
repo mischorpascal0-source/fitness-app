@@ -939,7 +939,6 @@ a.plan-button { display: inline-flex; align-items: center; text-decoration: none
 .workout-target-form input { width: 100%; }
 .workout-target-form button { grid-column: 1 / -1; }
 .workout-target-note { grid-column: 1 / -1; font-size: .75rem; line-height: 1.5; }
-.workout-position { margin-block: var(--space-4); font-size: .8125rem; }
 .workout-return { width: 100%; min-height: 3rem; margin-block: var(--space-3); }
 #workout-exercise-dialog .planner-actions > button { flex: 1 1 12rem; }
 .workout-replacement-controls { margin-block: var(--space-4); }
@@ -951,6 +950,31 @@ a.plan-button { display: inline-flex; align-items: center; text-decoration: none
 #workout-plan-changes .planner-note { line-height: 1.7; }
 #workout-plan-change-list { margin-block: var(--space-5); padding-left: 1.25rem; line-height: 2; color: var(--accent); }
 #workout-plan-changes .planner-actions > button { flex: 1 1 16rem; white-space: normal; }
+.workout-checkin-summary { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; justify-content: space-between; margin-bottom: var(--space-4); }
+.workout-checkin-summary .planner-note { flex: 1 1 12rem; font-size: .75rem; }
+.workout-checkin-summary button { font-size: .75rem; }
+.readiness-question { margin: var(--space-4) 0; padding: var(--space-3); min-width: 0; border: 1px solid var(--border); border-radius: var(--radius-control); }
+.readiness-question legend { padding-inline: var(--space-2); font-size: .9375rem; font-weight: 650; }
+.readiness-question label, .guidance-checkbox { display: flex; align-items: center; gap: var(--space-3); min-height: 2.75rem; padding-block: var(--space-2); font-size: .8125rem; }
+.readiness-question input, .guidance-checkbox input { flex: none; width: 1.25rem; height: 1.25rem; accent-color: var(--accent); }
+.readiness-muscles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr)); gap: var(--space-3); margin-block: var(--space-4); }
+.readiness-muscles label { min-width: 0; padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--background); font-size: .8125rem; }
+#workout-checkin-date, #workout-checkin-muscles > p { font-size: .8125rem; line-height: 1.6; margin-bottom: var(--space-3); }
+#workout-checkin-clear-remaining { width: 100%; font-size: .8125rem; }
+.workout-guidance { display: grid; gap: var(--space-2); padding: var(--space-3); border: 1px solid #747299; border-radius: var(--radius-control); margin-bottom: var(--space-4); background: linear-gradient(145deg, #303A55, #242C43); box-shadow: var(--shadow-card); }
+.workout-guidance .eyebrow { font-size: .625rem; }
+.workout-guidance .planner-note, .guidance-baseline { font-size: .75rem; line-height: 1.6; }
+.guidance-today { display: block; color: var(--accent); font-size: .9375rem; overflow-wrap: anywhere; }
+.guidance-confidence { font-size: .6875rem; color: var(--muted); }
+.workout-guidance .workout-instructions, .workout-guidance .workout-notice { margin: 0; }
+.workout-guidance .workout-instructions { font-size: .8125rem; }
+.workout-guidance > button { font-size: .8125rem; white-space: normal; }
+.guidance-range, .guidance-profile { grid-column: 1 / -1; }
+.guidance-profile .plan-editor-label { margin-bottom: var(--space-3); }
+.guidance-profile .planner-note { font-size: .75rem; line-height: 1.6; }
+.workout-set-kind { grid-column: 1 / -1; display: flex; align-items: center; gap: var(--space-2); min-height: 2.75rem; padding-bottom: var(--space-2); border-bottom: 1px solid var(--border); color: var(--muted); font-size: .6875rem; }
+.workout-set-kind input[type="checkbox"] { appearance: auto; width: 1.125rem; height: 1.125rem; flex: none; border: 0; accent-color: var(--accent); }
+.workout-set-kind input[type="checkbox"]:checked::after { content: none; }
 .active-workout { color: var(--text); background: var(--control-gradient); border: 1px solid var(--control-border); box-shadow: var(--shadow-card); }
 .live-dot { background: var(--accent-blue); box-shadow: 0 0 0 4px rgb(145 216 255 / .1); }
 

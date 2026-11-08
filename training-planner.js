@@ -310,6 +310,10 @@ const trainingPlanner = (() => {
       field.addEventListener("change", () => {
         if (field.validity.valid) {
           entry[field.name] = field.valueAsNumber;
+          if (field.name === "reps" && entry.repRange) {
+            const [min, max] = entry.repRange.split("-").map(Number);
+            if (entry.reps < min || entry.reps > max) delete entry.repRange;
+          }
           if (field.name === "sets") renderSessionTime(time, session);
           save("Änderungen gespeichert.");
         }
@@ -444,7 +448,7 @@ const trainingPlanner = (() => {
     if (entry) {
       const exerciseIndex = session.exercises.indexOf(entry);
       if (exerciseIndex < 0 || choice.id === entry.id) return;
-      session.exercises[exerciseIndex] = { ...choice, sets: entry.sets, reps: entry.reps };
+      session.exercises[exerciseIndex] = { ...choice, sets: entry.sets, reps: entry.reps, ...(entry.repRange ? { repRange: entry.repRange } : {}) };
       focusSelector = `${row} [data-exercise-index="${exerciseIndex}"] .plan-exercise-replace`;
     } else {
       if (session.exercises.length >= limits.exercises) return;

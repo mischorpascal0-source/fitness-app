@@ -16,6 +16,7 @@
   <script src="plan-generator.js" defer></script>
   <script src="training-planner.js" defer></script>
   <script src="exercise-library.js" defer></script>
+  <script src="training-guidance.js" defer></script>
   <script src="workout-state.js" defer></script>
   <script src="strength-dashboard.js" defer></script>
   <script src="daily-tracking.js" defer></script>
@@ -392,6 +393,23 @@
     <h3>Ausführung</h3>
     <ol id="detail-steps"></ol>
   </dialog>
+  <dialog id="workout-checkin-dialog" aria-labelledby="workout-checkin-title">
+    <div class="detail-header"><h2 id="workout-checkin-title">Wie fühlst du dich heute?</h2><button id="workout-checkin-close" class="plan-button" type="button">Abbrechen</button></div>
+    <p id="workout-checkin-date" class="planner-note"></p>
+    <form id="workout-checkin-form">
+      <fieldset class="readiness-question"><legend>Hast du aktuell Muskelkater?</legend><label><input type="radio" name="soreness" value="no" required>Nein, kein Muskelkater</label><label><input type="radio" name="soreness" value="yes" required>Ja, Muskelgruppen bewerten</label></fieldset>
+      <section id="workout-checkin-muscles" hidden>
+        <p class="planner-note">Bewerte jede Gruppe: 0 = kein, 1 = wenig, 10 = sehr starker Muskelkater. Unbeantwortete Gruppen bleiben offen.</p>
+        <button id="workout-checkin-clear-remaining" class="plan-button" type="button">Alle übrigen: kein Muskelkater</button>
+        <div id="workout-checkin-scores" class="readiness-muscles"></div>
+      </section>
+      <fieldset class="readiness-question"><legend>Hast du akute oder ungewöhnliche Schmerzen, Gelenkschmerzen oder eine deutliche Schwellung?</legend><label><input type="radio" name="pain" value="no" required>Nein</label><label><input type="radio" name="pain" value="yes" required>Ja</label></fieldset>
+      <div id="workout-checkin-pain" hidden><p class="workout-notice">Für betroffene Übungen ist eine Pause und gegebenenfalls fachliche Abklärung sinnvoll. Eine geringere Last ist keine Belastungsfreigabe.</p><fieldset class="readiness-question"><legend>Welche Bereiche sind betroffen?</legend><div id="workout-checkin-pain-groups"></div></fieldset></div>
+      <p id="workout-checkin-status" class="planner-note" role="status"></p>
+      <button id="workout-checkin-submit" class="plan-button primary workout-return" type="submit">Training starten</button>
+      <p class="planner-note workout-storage-note">Selbsteinschätzung und Produktheuristik. Keine medizinische Einschätzung oder Garantie gegen Verletzungen.</p>
+    </form>
+  </dialog>
   <dialog id="strength-workout-dialog" class="workout-page" aria-labelledby="strength-workout-title">
     <div class="workout-page-shell">
       <div class="workout-toolbar">
@@ -402,6 +420,7 @@
       <p id="workout-paused" class="workout-notice" hidden>Training pausiert. Deine Eingaben sind gespeichert.</p>
       <button class="plan-button workout-rest" id="workout-rest-skip" type="button" hidden>Erholung <span id="workout-rest"></span> · Pause beenden</button>
       <div id="workout-exercise-stage">
+        <div class="workout-checkin-summary"><span id="workout-checkin-summary" class="planner-note"></span><button id="workout-checkin-edit" class="plan-button" type="button">Muskelkater &amp; Beschwerden</button></div>
         <div class="workout-progress-copy"><strong>Deine Übungen</strong><span id="workout-set-progress"></span></div>
         <progress id="workout-progress" value="0" max="1" aria-label="Absolvierte Sätze"></progress>
         <p id="workout-order-help" class="planner-note">Tippe eine Übung an. Am Griff kannst du sie verschieben – mit der Tastatur per Pfeiltasten.</p>
