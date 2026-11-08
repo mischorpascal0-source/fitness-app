@@ -65,3 +65,9 @@ Das Repository ist für Vercel eingerichtet. Dort liefert Vercel die Browserdate
 4. Richte für die Selbstregistrierung externer Nutzer einen eigenen SMTP-Versand ein. Der Standardversand ist auf E-Mail-Adressen des Supabase-Teams beschränkt. [Supabase-Mailversand](https://supabase.com/docs/guides/auth/auth-smtp)
 
 Der lokale Vercel-Build lässt sich mit `node build-vercel.cjs` prüfen. Für einen eigenen HTTPS-Reverse-Proxy kannst du weiterhin `server.cjs` verwenden und `FITNESS_PUBLIC_ORIGIN` auf die öffentliche HTTPS-Adresse setzen.
+
+### Änderungen gemeinsam veröffentlichen
+
+Commits auf `main` werden automatisch von Vercel gebaut und nach erfolgreichem Build unter [der App-Adresse](https://fitness-app-two-ruddy.vercel.app) veröffentlicht. `vercel.json` aktiviert Git-Deployments ausdrücklich. Für die tägliche Arbeit genügen Commit und Push nach GitHub; ein zusätzlicher Upload zu Vercel entfällt.
+
+Für parallele Arbeit könnt ihr eigene Branches verwenden und fertige Änderungen per Pull Request nach `main` übernehmen. Vercel veröffentlicht dann den zusammengeführten Stand. Den Build-Status findet ihr beim jeweiligen Commit auf GitHub und im Vercel-Projekt unter **Deployments**.
