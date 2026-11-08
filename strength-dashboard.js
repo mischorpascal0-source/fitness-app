@@ -355,11 +355,37 @@ const strengthDashboard = (() => {
   const checkinForm = document.querySelector("#workout-checkin-form");
   const checkinStatus = document.querySelector("#workout-checkin-status");
   let checkinContext;
-  for (const group of trainingGuidance.muscleGroups) {
-    const label = node("label", "plan-editor-label", group.label), select = node("select");
-    select.name = "sore-" + group.id;
-    select.append(new Option("Bitte bewerten", ""), ...Array.from({ length: 11 }, (_, value) => new Option(value === 0 ? "0 · Kein" : value === 1 ? "1 · Wenig" : value === 10 ? "10 · Sehr stark" : String(value), String(value))));
-    label.append(select); document.querySelector("#workout-checkin-scores").append(label);
+  const sorenessSections = [
+    ["Oberkörper", ["brust", "ruecken", "schultern", "nacken", "bizeps", "trizeps", "unterarme"]],
+    ["Körpermitte", ["rumpf", "unterer-ruecken"]],
+    ["Beine und Hüfte", ["gesaess", "huefte", "quadrizeps", "hamstrings", "adduktoren", "waden"]],
+  ];
+  for (const [title, ids] of sorenessSections) {
+    const section = node("section", "readiness-section"), heading = node("h3", "", title), list = node("div", "readiness-muscles");
+    heading.id = "readiness-section-" + ids[0]; section.setAttribute("aria-labelledby", heading.id);
+    for (const id of ids) {
+      const group = trainingGuidance.muscleGroups.find((entry) => entry.id === id);
+      const card = node("div", "readiness-slider-card"), header = node("div", "readiness-slider-heading");
+      const label = node("label", "", group.label), input = node("input"), output = node("output", "readiness-score");
+      input.type = "range"; input.name = "sore-" + id; input.id = "soreness-" + id;
+      input.min = 0; input.max = 10; input.step = 1; input.defaultValue = "0"; input.value = "0";
+      input.className = "readiness-slider"; input.setAttribute("aria-describedby", "workout-checkin-scale-help");
+      label.htmlFor = input.id; output.setAttribute("for", input.id); output.setAttribute("aria-hidden", "true");
+      const update = () => {
+        const value = Number(input.value);
+        output.value = `${value} / 10`;
+        input.style.setProperty("--score-progress", `${value * 10}%`);
+        input.setAttribute("aria-valuetext", `${value} von 10${value === 0 ? ", kein Muskelkater" : value === 10 ? ", sehr starker Muskelkater" : ""}`);
+      };
+      input.addEventListener("input", update); input.addEventListener("change", update); update();
+      const scale = node("div", "readiness-slider-scale"); scale.setAttribute("aria-hidden", "true");
+      scale.append(node("span", "", "0 · Kein"), node("span", "", "10 · Sehr stark"));
+      header.append(label, output); card.append(header, input, scale); list.append(card);
+    }
+    section.append(heading, list); document.querySelector("#workout-checkin-scores").append(section);
+  }
+  function updateSorenessSliders() {
+    for (const input of checkinForm.querySelectorAll(".readiness-slider")) input.dispatchEvent(new Event("input"));
   }
   for (const group of [{ id: "all", label: "Unklar / mehrere Bereiche" }, ...trainingGuidance.muscleGroups]) {
     const label = node("label"), box = node("input"); box.type = "checkbox"; box.name = "painGroup"; box.value = group.id;
@@ -372,7 +398,6 @@ const strengthDashboard = (() => {
     const sore = checkinForm.elements.soreness.value === "yes", pain = checkinForm.elements.pain.value === "yes";
     document.querySelector("#workout-checkin-muscles").hidden = !sore;
     document.querySelector("#workout-checkin-pain").hidden = !pain;
-    for (const select of document.querySelectorAll("#workout-checkin-scores select")) select.required = sore;
   }
   function openCheckin(edit = false) {
     if (!storageKey || (edit && !journal?.active)) return;
@@ -386,13 +411,15 @@ const strengthDashboard = (() => {
       for (const group of trainingGuidance.muscleGroups) checkinForm.elements["sore-" + group.id].value = String(previous.scores[group.id]);
       for (const input of checkinForm.querySelectorAll('[name="painGroup"]')) input.checked = previous.painGroups.includes(input.value);
     }
+    updateSorenessSliders();
     document.querySelector("#workout-checkin-date").textContent = "Dein Zustand jetzt · " + fullDate.format(new Date()) + ". Das gilt auch für nachgeholte Trainingstage.";
     document.querySelector("#workout-checkin-submit").textContent = edit ? "Check-in speichern" : "Training starten";
     toggleCheckinFields(); if (sheet.open) sheet.close(); checkinDialog.showModal(); checkinDialog.scrollTop = 0;
   }
   checkinForm.addEventListener("change", toggleCheckinFields);
-  document.querySelector("#workout-checkin-clear-remaining").addEventListener("click", () => {
-    for (const select of checkinForm.querySelectorAll("#workout-checkin-scores select")) if (select.value === "") select.value = "0";
+  document.querySelector("#workout-checkin-reset").addEventListener("click", () => {
+    for (const input of checkinForm.querySelectorAll(".readiness-slider")) input.value = "0";
+    updateSorenessSliders();
   });
   document.querySelector("#workout-checkin-close").addEventListener("click", () => { checkinDialog.close(); checkinContext = null; if (journal?.active) renderWorkout(); });
   checkinDialog.addEventListener("cancel", () => { checkinContext = null; if (journal?.active) renderWorkout(); });
@@ -403,7 +430,7 @@ const strengthDashboard = (() => {
     const scores = Object.fromEntries(trainingGuidance.muscleGroups.map(({ id }) => [id, checkinForm.elements.soreness.value === "no" ? 0 : Number(checkinForm.elements["sore-" + id].value)]));
     const pain = checkinForm.elements.pain.value === "yes";
     const checkin = { scores, pain, painGroups: pain ? [...checkinForm.querySelectorAll('[name="painGroup"]:checked')].map(({ value }) => value) : [], checkedAt: Date.now() };
-    if (!trainingGuidance.validateCheckin(checkin)) { checkinStatus.textContent = "Bewerte alle Muskelgruppen und wähle bei Beschwerden mindestens einen betroffenen Bereich aus."; return; }
+    if (!trainingGuidance.validateCheckin(checkin)) { checkinStatus.textContent = "Prüfe die Angaben und wähle bei Beschwerden mindestens einen betroffenen Bereich aus."; return; }
     if (checkinContext.workoutId) {
       journal = readJournal();
       if (journal.active?.id !== checkinContext.workoutId) { checkinStatus.textContent = "Die Einheit wurde inzwischen geändert. Öffne sie erneut."; return; }

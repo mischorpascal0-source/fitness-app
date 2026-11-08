@@ -957,10 +957,23 @@ a.plan-button { display: inline-flex; align-items: center; text-decoration: none
 .readiness-question legend { padding-inline: var(--space-2); font-size: .9375rem; font-weight: 650; }
 .readiness-question label, .guidance-checkbox { display: flex; align-items: center; gap: var(--space-3); min-height: 2.75rem; padding-block: var(--space-2); font-size: .8125rem; }
 .readiness-question input, .guidance-checkbox input { flex: none; width: 1.25rem; height: 1.25rem; accent-color: var(--accent); }
-.readiness-muscles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr)); gap: var(--space-3); margin-block: var(--space-4); }
-.readiness-muscles label { min-width: 0; padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--background); font-size: .8125rem; }
+.readiness-section { margin-top: var(--space-5); }
+.readiness-section h3 { margin-bottom: var(--space-3); color: var(--accent); font-size: .875rem; }
+.readiness-muscles { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
+.readiness-slider-card { min-width: 0; padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--background); }
+.readiness-slider-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.readiness-slider-heading label { min-width: 0; font-size: .8125rem; font-weight: 650; }
+.readiness-score { flex: none; min-width: 3.5rem; padding: .25rem .5rem; border-radius: var(--radius-pill); color: var(--accent); background: var(--raised); font-size: .8125rem; font-weight: 750; font-variant-numeric: tabular-nums; text-align: center; }
+.readiness-slider { appearance: none; display: block; width: 100%; height: 2.75rem; margin: 0; padding: 0; background: transparent; cursor: pointer; accent-color: var(--accent); }
+.readiness-slider::-webkit-slider-runnable-track { height: .375rem; border-radius: var(--radius-pill); background: linear-gradient(to right, var(--accent) var(--score-progress, 0%), var(--border) var(--score-progress, 0%)); }
+.readiness-slider::-webkit-slider-thumb { appearance: none; width: 1.5rem; height: 1.5rem; margin-top: -.5625rem; border: 2px solid var(--text); border-radius: 50%; background: var(--accent); box-shadow: 0 2px 6px rgb(0 0 0 / .35); }
+.readiness-slider::-moz-range-track { height: .375rem; border-radius: var(--radius-pill); background: var(--border); }
+.readiness-slider::-moz-range-progress { height: .375rem; border-radius: var(--radius-pill); background: var(--accent); }
+.readiness-slider::-moz-range-thumb { width: 1.25rem; height: 1.25rem; border: 2px solid var(--text); border-radius: 50%; background: var(--accent); }
+.readiness-slider-scale { display: flex; justify-content: space-between; gap: var(--space-2); color: var(--muted); font-size: .6875rem; }
+@media (min-width: 40rem) { .readiness-muscles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 #workout-checkin-date, #workout-checkin-muscles > p { font-size: .8125rem; line-height: 1.6; margin-bottom: var(--space-3); }
-#workout-checkin-clear-remaining { width: 100%; font-size: .8125rem; }
+#workout-checkin-reset { width: 100%; font-size: .8125rem; }
 .workout-guidance { display: grid; gap: var(--space-2); padding: var(--space-3); border: 1px solid #747299; border-radius: var(--radius-control); margin-bottom: var(--space-4); background: linear-gradient(145deg, #303A55, #242C43); box-shadow: var(--shadow-card); }
 .workout-guidance .eyebrow { font-size: .625rem; }
 .workout-guidance .planner-note, .guidance-baseline { font-size: .75rem; line-height: 1.6; }

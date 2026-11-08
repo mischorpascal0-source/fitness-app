@@ -32,7 +32,7 @@ Für den Trend sind mindestens drei vollständige Einheiten desselben Wiederholu
 
 ## Muskelkater und Beschwerden
 
-Ein neuer Trainingsstart verlangt den Check-in. „Nein“ setzt alle Muskelgruppen ausdrücklich auf 0. Bei „Ja“ muss jede Gruppe mit 0–10 bewertet werden; eine ausdrückliche Sammelaktion setzt nur die übrigen offenen Gruppen auf 0. Schmerzen/Gelenkbeschwerden/Schwellung werden separat abgefragt, einschließlich betroffener Bereiche. Zeitstempel und Angaben beschreiben den tatsächlichen Zustand beim Check-in, auch bei nachgeholten Einheiten.
+Ein neuer Trainingsstart verlangt den Check-in. Alle Muskelgruppen einer neuen Bewertung sind mit 0 vorbelegt. Bei „Ja“ lassen sich betroffene Gruppen per Slider auf 0–10 einstellen; Zahlenwert und Skalenenden bleiben sichtbar. Die Oberfläche gliedert die Gruppen anatomisch in Oberkörper, Körpermitte sowie Beine und Hüfte. „Nein“ verwendet für alle Gruppen 0, die Rücksetz-Aktion setzt alle Regler auf 0. Beim Bearbeiten einer bestehenden Bewertung werden ihre gespeicherten Werte angezeigt. Schmerzen/Gelenkbeschwerden/Schwellung werden separat abgefragt, einschließlich betroffener Bereiche. Zeitstempel und Angaben beschreiben den tatsächlichen Zustand beim Check-in, auch bei nachgeholten Einheiten.
 
 Übungen werden auf gemeinsame Muskelgruppen abgebildet. Primärmuskeln zählen vollständig, unterstützende Muskeln mit Faktor 0,65. Überlappungen werden dedupliziert; es gilt das Maximum statt einer Multiplikation der Abschläge. Die folgenden Schwellen sind veränderbare Produktheuristiken:
 
