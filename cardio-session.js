@@ -10,7 +10,7 @@ const cardioSession = (() => {
     try { if (session) localStorage.setItem(storageKey(), JSON.stringify(session)); else localStorage.removeItem(storageKey()); }
     catch { status.textContent = 'Der Timer läuft, konnte aber nicht für ein Neuladen gespeichert werden.'; }
   }
-  function proposals() { return cardioSuggestions.suggest(sport, cardioGarmin.getSnapshot(), find('experience').value); }
+  function proposals() { return cardioSuggestions.suggest(sport, cardioGarmin.getSnapshot()); }
   function renderSuggestions() {
     if (!sport || selected) return;
     const result = proposals();
@@ -57,13 +57,12 @@ const cardioSession = (() => {
   for (const [key, name] of Object.entries(cardioSuggestions.sports)) {
     const button = node('button', name, 'plan-button'); button.type = 'button'; button.dataset.sport = key; button.setAttribute('aria-pressed', 'false');
     button.addEventListener('click', () => {
-      sport = key; find('experience').value = 'new';
+      sport = key;
       for (const other of find('sports').children) other.setAttribute('aria-pressed', String(other === button));
       renderSuggestions();
     }); find('sports').append(button);
   }
   find('start').addEventListener('click', () => { find('start').setAttribute('aria-expanded', 'true'); render(); find('sports').querySelector('button').focus(); });
-  find('experience').addEventListener('change', renderSuggestions);
   find('training-back').addEventListener('click', () => { selected = null; done = false; completedElapsed = 0; status.textContent = ''; render(); find('sports').querySelector('button').focus(); });
   find('training-start').addEventListener('click', () => {
     if (!selected || session || done || !accountId) return;
@@ -72,7 +71,7 @@ const cardioSession = (() => {
     if (!updated || JSON.stringify(updated) !== JSON.stringify(selected)) {
       selected = null; render(); status.textContent = 'Die Datengrundlage hat sich geändert. Bitte wähle eine aktuelle Einheit.'; return;
     }
-    session = { id: crypto.randomUUID(), unit: selected, sport, experience: find('experience').value, date: new Date().toLocaleDateString('sv-SE'), elapsed: 0, startedAt: Date.now(), running: true };
+    session = { id: crypto.randomUUID(), unit: selected, sport, date: new Date().toLocaleDateString('sv-SE'), elapsed: 0, startedAt: Date.now(), running: true };
     persist(); render();
   });
   find('training-pause').addEventListener('click', () => {
@@ -95,13 +94,13 @@ const cardioSession = (() => {
   return {
     setAccount(id) {
       accountId = id ?? null; completedElapsed = 0; suggestionSignature = null; session = null; selected = null; sport = null; done = false; status.textContent = '';
-      find('experience').value = 'new'; find('start').setAttribute('aria-expanded','false');
+      find('start').setAttribute('aria-expanded','false');
       for (const button of find('sports').children) button.setAttribute('aria-pressed','false');
       if (accountId) {
         try {
           const cached = JSON.parse(localStorage.getItem(storageKey()));
           if (cached && typeof cached.id === 'string' && cardioSuggestions.sports[cached.sport] && cached.unit?.sport === cached.sport && !cached.unit.rest && typeof cached.unit.title === 'string' && Array.isArray(cached.unit.steps) && cached.unit.steps.every(s => typeof s === 'string') && Number.isFinite(cached.unit.minutes) && cached.unit.minutes > 0 && Number.isFinite(cached.elapsed) && cached.elapsed >= 0 && typeof cached.running === 'boolean' && Number.isFinite(cached.startedAt) && cached.startedAt <= Date.now() && /^\d{4}-\d{2}-\d{2}$/.test(cached.date)) {
-            session = cached; selected = cached.unit; sport = cached.sport; find('experience').value = cached.experience === 'regular' ? 'regular' : 'new';
+            session = cached; selected = cached.unit; sport = cached.sport;
             find('start').setAttribute('aria-expanded','true'); status.textContent = 'Deine begonnene Einheit wurde wiederhergestellt.';
           }
         } catch { status.textContent = 'Die letzte Einheit konnte nicht wiederhergestellt werden.'; }
