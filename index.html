@@ -658,8 +658,10 @@
   <dialog id="food-scan-dialog" aria-labelledby="food-scan-title">
     <div class="detail-header"><h2 id="food-scan-title">Barcode scannen</h2><form method="dialog"><button class="plan-button">Schließen</button></form></div>
     <p class="planner-note">Halte den Barcode oder Produkt-QR-Code vor die Kamera.</p>
+    <p class="planner-note" id="food-scan-permission-hint" hidden>Wähle in der Browserabfrage die Freigabe für weitere Besuche. In Chrome heißt sie „Beim Besuch der Website zulassen“.</p>
     <video id="food-scan-video" autoplay muted playsinline hidden aria-label="Kameravorschau"></video>
     <p class="planner-note" id="food-scan-status" role="status"></p>
+    <button class="plan-button" id="food-scan-manual" type="button" hidden>Barcode eingeben</button>
   </dialog>
   <dialog id="food-missing-dialog" aria-labelledby="food-missing-title">
     <div class="detail-header"><h2 id="food-missing-title">Eigenes Lebensmittel</h2><form method="dialog"><button class="plan-button">Abbrechen</button></form></div>

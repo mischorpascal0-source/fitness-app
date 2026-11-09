@@ -11,8 +11,11 @@ const fitnessFoodCatalog = (() => {
   const missingStatus = document.querySelector("#food-missing-status");
   const missingSave = missingForm.querySelector("button[type=submit]");
   const scanDialog = document.querySelector("#food-scan-dialog");
+  const scanPermissionHint = document.querySelector("#food-scan-permission-hint");
   const scanStatus = document.querySelector("#food-scan-status");
+  const scanManual = document.querySelector("#food-scan-manual");
   const video = document.querySelector("#food-scan-video");
+  const cameraPreferenceKey = "fitness-app.barcode-camera.v1";
   const nutrients = { kcal: "calories", protein: "protein", carbs: "carbs", fat: "fat" };
   const sourceNames = { own: "Eigenes Lebensmittel", shared: "Gemeinsamer Katalog", off: "Open Food Facts" };
   let accountId, product, missingBarcode, missingShared, lookupController, saveController, camera, scannerScript;
@@ -145,20 +148,41 @@ const fitnessFoodCatalog = (() => {
     video.hidden = true;
   }
 
+  function cameraRemembered() {
+    try {
+      return localStorage.getItem(cameraPreferenceKey) === "allowed";
+    } catch {
+      return false;
+    }
+  }
+
+  function rememberCamera(allowed) {
+    try {
+      if (allowed) localStorage.setItem(cameraPreferenceKey, "allowed");
+      else localStorage.removeItem(cameraPreferenceKey);
+    } catch {
+      // The browser can still grant camera access with local storage blocked.
+    }
+  }
+
   async function scan() {
     if (scanDialog.open) return;
     const current = {};
     camera = current;
-    scanDialog.showModal();
+    scanPermissionHint.hidden = cameraRemembered();
+    scanManual.hidden = true;
     scanStatus.textContent = "Kamera wird geöffnet …";
+    scanDialog.showModal();
     try {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error("Kamera nicht verfügbar");
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
-      current.stream = stream;
-      if (camera !== current) {
+      if (camera !== current || !scanDialog.open) {
         stream.getTracks().forEach((track) => track.stop());
         return;
       }
+      current.stream = stream;
+      rememberCamera(true);
+      scanPermissionHint.hidden = true;
       const { BrowserMultiFormatReader } = await loadScanner();
       if (camera !== current) return;
       video.hidden = false;
@@ -177,10 +201,17 @@ const fitnessFoodCatalog = (() => {
         lookup("barcode", { barcode });
       });
       if (camera !== current) current.controls.stop();
-    } catch {
+    } catch (error) {
       if (camera !== current) return;
       stopCamera();
-      scanStatus.textContent = "Kamera konnte nicht geöffnet werden. Gib den Barcode über die Suche ein.";
+      scanPermissionHint.hidden = true;
+      scanManual.hidden = false;
+      if (["NotAllowedError", "SecurityError"].includes(error?.name)) {
+        rememberCamera(false);
+        scanStatus.textContent = "Kamerazugriff blockiert. Erlaube die Kamera in den Einstellungen der Website oder des Geräts.";
+      } else {
+        scanStatus.textContent = "Der Scanner konnte nicht gestartet werden. Gib den Barcode ein oder versuche es erneut.";
+      }
     }
   }
 
@@ -213,6 +244,10 @@ const fitnessFoodCatalog = (() => {
     else lookup("search", { query });
   });
   document.querySelector("#food-scan-open").addEventListener("click", scan);
+  scanManual.addEventListener("click", () => {
+    scanDialog.close();
+    lookupForm.elements.query.focus();
+  });
   scanDialog.addEventListener("close", () => { if (!scanDialog.open) stopCamera(); });
   missingDialog.addEventListener("close", () => {
     if (missingDialog.open) return;

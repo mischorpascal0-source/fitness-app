@@ -25,6 +25,8 @@ Unter **Training** findest du den Wochenkalender und die zum gewählten Tag pass
 
 Unter **Ernährung → + Eintragen** suchst du nach Name, Marke oder Barcode. **Barcode scannen** öffnet die Kamera und liest EAN- und UPC-Barcodes sowie Produkt-QR-Codes mit GTIN. Dafür braucht der Browser Zugriff auf die Kamera und eine HTTPS-Adresse oder `localhost`.
 
+Die App merkt sich den erfolgreichen Kamerazugriff in diesem Browser auf dem Gerät. Wie lange die Freigabe gilt, bestimmt der Browser. In Chrome auf dem iPhone wählst du in der Kameraabfrage **Beim Besuch der Website zulassen**. [Kamera-Einstellungen in Chrome](https://support.google.com/chrome/answer/2693767?co=GENIE.Platform%3DiOS&hl=de)
+
 Tippe im Ernährungstagebuch direkt auf **Frühstück**, **Mittagessen**, **Abendessen** oder **Snacks**, um eine Portion für diese Mahlzeit am gewählten Kalendertag einzutragen. Nach dem Speichern öffnet **Weitere hinzufügen** die Eingabe für dieselbe Mahlzeit und dasselbe Datum. Mit **Fertig** kehrst du zum Tagebuch zurück.
 
 Über **Vortag** siehst du die Lebensmittel der Mahlzeit vom vorherigen Kalendertag. Im Vorschaufenster kannst du auch ein früheres Datum wählen. **Mahlzeit übernehmen** fügt die angezeigten Lebensmittel mit ihren Nährwerten zum ausgewählten Zieldatum hinzu. Bereits aus dieser Quelle übernommene Einträge werden beim erneuten Öffnen erkannt.
