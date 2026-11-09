@@ -23,7 +23,8 @@ const cardioSession = (() => {
       const button = node('button', 'Einheit auswählen', 'plan-button'); button.type = 'button';
       button.addEventListener('click', () => { selected = unit; done = false; status.textContent = ''; render(); find('selected').focus(); });
       const list = node('ol'); unit.steps.forEach(step => list.append(node('li', step)));
-      card.append(node('small', unit.source, 'eyebrow'), node('h3', unit.title), node('p', `${unit.rest ? 'Ruhetag' : unit.minutes + ' Min.'} · ${unit.intensity}`), list, node('p', unit.reason, 'planner-note'), button);
+      if (unit.source === 'Allgemeiner Vorschlag') card.append(node('small', unit.source, 'eyebrow'));
+      card.append(node('h3', unit.title), node('p', `${unit.rest ? 'Ruhetag' : unit.minutes + ' Min.'} · ${unit.intensity}`), list, node('p', unit.reason, 'planner-note'), button);
       return card;
     }));
   }
@@ -45,7 +46,7 @@ const cardioSession = (() => {
     find('training-pause').textContent = session?.running ? 'Pause' : 'Fortsetzen';
     if (selected) {
       find('selected-title').textContent = selected.title;
-      find('selected-meta').textContent = `${selected.source} · ${selected.rest ? 'Ruhetag' : selected.minutes + ' Min.'} · ${selected.intensity}`;
+      find('selected-meta').textContent = `${selected.source === 'Allgemeiner Vorschlag' ? selected.source + ' · ' : ''}${selected.rest ? 'Ruhetag' : selected.minutes + ' Min.'} · ${selected.intensity}`;
       find('selected-steps').replaceChildren(...selected.steps.map(step => node('li', step)));
       find('selected-reason').textContent = selected.reason;
       find('timer').hidden = selected.rest;
