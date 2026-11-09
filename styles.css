@@ -800,8 +800,27 @@ a.plan-button { display: inline-flex; align-items: center; text-decoration: none
 .social-stats { grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); }
 #social-share-preview, #social-recipients label { overflow-wrap: anywhere; min-width: 0; }
 .date-control input { min-width: 0; max-width: 9rem; min-height: 2.75rem; padding: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--raised); color: var(--text); font: inherit; font-size: var(--text-small); }
+.nutrition-dialog[open] { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+.nutrition-dialog > .detail-header { position: static; flex: none; margin: 0; }
+.nutrition-dialog > .detail-header h2 { min-width: 0; font-size: clamp(1rem, 4.5vw, 1.375rem); overflow-wrap: anywhere; }
+.nutrition-dialog-scroll { min-height: 0; overflow: auto; overscroll-behavior: contain; padding: var(--space-3) var(--dialog-padding); scroll-padding-block: var(--space-3); }
+.nutrition-dialog-footer { flex: none; display: grid; gap: var(--space-2); padding: var(--space-3) var(--dialog-padding) max(var(--space-3), env(safe-area-inset-bottom)); border-top: 1px solid var(--border); background: var(--surface); }
+.nutrition-dialog-actions { display: grid; gap: var(--space-2); }
+.nutrition-dialog-actions form > button { width: 100%; }
+.nutrition-dialog .planner-note:empty { display: none; }
 .food-lookup, .food-portion { padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-control); }
-.food-lookup .planner-actions { margin-block: var(--space-2); }
+.food-lookup-actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: var(--space-2); margin-block: var(--space-2); }
+.food-lookup-actions button { padding-inline: var(--space-2); }
+.food-lookup > small { display: block; font-size: .75rem; }
+.food-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2) var(--space-3); }
+.food-fields input, #meal-copy-form input { padding-inline: var(--space-2); }
+#food-form:has([name="meal"]:disabled) #food-date-field { grid-column: 1 / -1; }
+#food-form fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+#food-form legend { margin-bottom: var(--space-2); font-size: .875rem; font-weight: 650; }
+.food-saved { display: flex; align-items: start; gap: var(--space-3); padding: var(--space-3) 0; overflow-wrap: anywhere; }
+.food-saved > .icon-tile { flex: none; }
+.food-saved p { margin-top: var(--space-1); }
+.meal-copy-preview li { display: block; overflow-wrap: anywhere; }
 #food-lookup-results li { flex-wrap: wrap; }
 #food-lookup-results button { flex-shrink: 0; }
 #food-scan-video { width: 100%; max-height: 44dvh; object-fit: contain; border-radius: var(--radius-control); background: var(--background); }
@@ -821,10 +840,14 @@ a.plan-button { display: inline-flex; align-items: center; text-decoration: none
 .macro-grid > div:nth-child(3) { border-color: #CEB2E9; }
 .macro-grid small { color: var(--muted); font-size: .6875rem; overflow-wrap: anywhere; }
 .meal-list { display: grid; gap: var(--space-3); }
+.meal-card-header { display: flex; align-items: start; gap: var(--space-2); }
+.meal-card-header h3 { flex: 1; min-width: 0; }
 .meal-open { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); width: 100%; min-height: 2.75rem; padding: 0; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
 .meal-calories { color: var(--muted); font-size: var(--text-small); font-weight: 400; }
 .meal-add { margin-inline-start: auto; color: var(--accent); font-size: var(--text-small); font-weight: 650; }
 .meal-open:hover .meal-add { text-decoration: underline; }
+.meal-copy-trigger { display: inline-flex; align-items: center; gap: var(--space-1); flex: none; padding-inline: var(--space-2); font-size: var(--text-small); }
+.meal-copy-trigger svg { width: 1rem; height: 1rem; color: var(--accent); }
 .meal-empty { margin-top: var(--space-2); color: var(--muted); font-size: var(--text-small); }
 .activity-chart { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); align-items: end; gap: var(--space-2); height: 9rem; }
 .activity-chart > div { display: grid; grid-template-rows: auto 1fr auto; align-items: end; justify-items: center; gap: var(--space-1); height: 100%; min-width: 0; }
@@ -869,6 +892,7 @@ a.plan-button { display: inline-flex; align-items: center; text-decoration: none
 }
 @media (max-width: 40rem) {
   dialog { width: 100%; margin: auto 0 0; max-height: calc(100dvh - max(1.25rem, env(safe-area-inset-top))); border-radius: 1.5rem 1.5rem 0 0; padding-bottom: max(var(--space-5), env(safe-area-inset-bottom)); }
+  .nutrition-dialog[open] { position: fixed; inset: auto 0 var(--nutrition-keyboard-offset, 0px); margin: 0; max-height: calc(var(--nutrition-viewport-height, 100dvh) - max(.5rem, env(safe-area-inset-top))); }
   #strength-workout-dialog { height: 100dvh; max-height: 100dvh; border-radius: 0; border: 0; margin: 0; }
   .login-shell .page-header { margin-top: var(--space-5); }
 }

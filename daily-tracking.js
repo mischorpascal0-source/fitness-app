@@ -15,6 +15,17 @@ const dailyTracking = (() => {
   const foodDialog = document.querySelector("#food-dialog");
   const foodForm = document.querySelector("#food-form");
   const foodMeal = foodForm.elements.meal;
+  const foodScroll = foodDialog.querySelector(".nutrition-dialog-scroll");
+  const foodEntry = document.querySelector("#food-entry");
+  const foodSaved = document.querySelector("#food-saved");
+  const foodSubmit = document.querySelector("#food-submit");
+  const foodActions = document.querySelector("#food-saved-actions");
+  const foodAddMore = document.querySelector("#food-add-more");
+  const foodSaveStatus = document.querySelector("#food-save-status");
+  const mealCopyDialog = document.querySelector("#meal-copy-dialog");
+  const mealCopyForm = document.querySelector("#meal-copy-form");
+  const mealCopySource = mealCopyForm.elements.date;
+  const mealCopyStatus = document.querySelector("#meal-copy-status");
   const cardioForm = document.querySelector("#cardio-form");
   const weightForm = document.querySelector("#weight-form");
   const nutritionStatus = document.querySelector("#nutrition-status");
@@ -29,6 +40,7 @@ const dailyTracking = (() => {
   let storageKey;
   let data = emptyData();
   let mobilityTimer;
+  let foodOpener, savedMeal, mealCopy;
   let lastToday = today();
 
   function today() {
@@ -230,6 +242,8 @@ const dailyTracking = (() => {
       const items = entries.filter((entry) => entry.meal === meal);
       const card = document.createElement("section");
       card.className = "card library-panel";
+      const header = document.createElement("div");
+      header.className = "meal-card-header";
       const title = document.createElement("h3");
       const open = document.createElement("button");
       open.type = "button";
@@ -251,7 +265,17 @@ const dailyTracking = (() => {
       add.textContent = "+ Eintragen";
       open.append(name, calories, add);
       title.append(open);
-      card.append(title);
+      const copy = document.createElement("button");
+      copy.type = "button";
+      copy.id = "meal-copy-" + index;
+      copy.className = "plan-button meal-copy-trigger";
+      copy.setAttribute("aria-label", meal + " vom Vortag übernehmen");
+      copy.setAttribute("aria-haspopup", "dialog");
+      copy.setAttribute("aria-controls", "meal-copy-dialog");
+      copy.innerHTML = '<svg aria-hidden="true"><use href="#icon-refresh"/></svg>Vortag';
+      copy.addEventListener("click", () => openMealCopy(meal, copy.id));
+      header.append(title, copy);
+      card.append(header);
       if (items.length) {
         const list = document.createElement("ul");
         list.className = "entry-list";
@@ -395,21 +419,68 @@ const dailyTracking = (() => {
     }, dailyForm.querySelector(".form-status"))) document.querySelector("#daily-dialog").close();
   });
 
+  function nutritionDateLabel(date) {
+    return weekFormat.format(new Date(date + "T12:00:00"));
+  }
+
+  function fitNutritionDialogs() {
+    const viewport = window.visualViewport;
+    if (!viewport || (!foodDialog.open && !mealCopyDialog.open)) return;
+    const style = document.documentElement.style;
+    style.setProperty("--nutrition-viewport-height", `${viewport.height}px`);
+    style.setProperty("--nutrition-keyboard-offset", `${Math.max(0, innerHeight - viewport.height - viewport.offsetTop)}px`);
+  }
+
+  window.visualViewport?.addEventListener("resize", fitNutritionDialogs);
+  window.visualViewport?.addEventListener("scroll", fitNutritionDialogs);
+
+  function showNutritionDialog(dialog) {
+    dialog.showModal();
+    fitNutritionDialogs();
+    dialog.querySelector(".nutrition-dialog-scroll").scrollTop = 0;
+  }
+
+  function showFoodResult(saved) {
+    foodEntry.hidden = saved;
+    foodSaved.hidden = !saved;
+    foodSubmit.hidden = saved;
+    foodActions.hidden = !saved;
+    foodScroll.scrollTop = 0;
+  }
+
+  function prepareFoodForm(meal, date) {
+    foodForm.reset();
+    fitnessFoodCatalog.reset();
+    foodSaveStatus.textContent = "";
+    foodForm.elements.date.value = date;
+    foodMeal.disabled = Boolean(meal);
+    foodMeal.closest("label").hidden = Boolean(meal);
+    if (meal) foodMeal.value = meal;
+    document.querySelector("#food-title").textContent = meal ? meal + " eintragen" : "Essen eintragen";
+    showFoodResult(false);
+  }
+
   function openFoodForm(meal) {
-    showForm(foodDialog, foodForm, () => {
-      fitnessFoodCatalog.reset();
-      foodForm.elements.date.value = keyForDate(nutritionDate);
-      foodMeal.disabled = Boolean(meal);
-      foodMeal.closest("label").hidden = Boolean(meal);
-      if (meal) foodMeal.value = meal;
-      document.querySelector("#food-title").textContent = meal ? meal + " eintragen" : "Essen eintragen";
-    });
+    foodOpener = meal ? "meal-open-" + mealNames.indexOf(meal) : "food-open";
+    prepareFoodForm(meal, keyForDate(nutritionDate));
+    showNutritionDialog(foodDialog);
   }
 
   document.querySelector("#food-open").addEventListener("click", () => openFoodForm());
+  foodAddMore.addEventListener("click", () => {
+    if (!savedMeal) return;
+    prepareFoodForm(savedMeal.meal, savedMeal.date);
+    savedMeal = undefined;
+    document.querySelector("#food-lookup-form input").focus({ preventScroll: true });
+  });
+  foodDialog.addEventListener("close", () => {
+    if (foodDialog.open) return;
+    document.getElementById(foodOpener)?.focus();
+    savedMeal = undefined;
+  });
   foodForm.addEventListener("submit", (event) => {
     event.preventDefault();
-    if (!foodForm.reportValidity()) return;
+    if (!foodDialog.open || foodEntry.hidden || !foodForm.reportValidity()) return;
     const name = foodForm.elements.foodName.value.trim();
     if (!name) {
       foodForm.elements.foodName.value = "";
@@ -418,14 +489,86 @@ const dailyTracking = (() => {
     }
     const entry = { id: crypto.randomUUID(), date: foodForm.elements.date.value, name, meal: foodMeal.value };
     for (const field of ["calories", "protein", "carbs", "fat"]) entry[field] = foodForm.elements[field].valueAsNumber;
-    if (commit((next) => next.foods.push(entry), foodForm.querySelector(".form-status"))) {
+    foodSaveStatus.textContent = "";
+    if (commit((next) => next.foods.push(entry), foodSaveStatus)) {
       if (entry.date !== keyForDate(nutritionDate)) {
         nutritionDate = new Date(entry.date + "T12:00:00");
         renderNutrition();
       }
-      foodDialog.close();
-      if (foodMeal.disabled) document.getElementById("meal-open-" + mealNames.indexOf(entry.meal))?.focus();
+      fitnessFoodCatalog.reset();
+      savedMeal = { meal: entry.meal, date: entry.date };
+      document.querySelector("#food-title").textContent = entry.meal + " eintragen";
+      document.querySelector("#food-saved-item").textContent = name + " · " + format.format(entry.calories) + " kcal";
+      document.querySelector("#food-saved-date").textContent = entry.meal + " am " + nutritionDateLabel(entry.date);
+      showFoodResult(true);
+      foodAddMore.focus();
     }
+  });
+
+  function mealCopyCandidates(foods, source, target, meal) {
+    const sourceItems = foods.filter((entry) => entry.date === source && entry.meal === meal);
+    const copiedIds = new Set(foods.filter((entry) => entry.date === target && entry.meal === meal).map((entry) => entry.copiedFromId));
+    return { total: sourceItems.length, items: sourceItems.filter((entry) => !copiedIds.has(entry.id)) };
+  }
+
+  function renderMealCopy() {
+    if (!mealCopy) return;
+    const source = mealCopySource.validity.valid ? mealCopySource.value : "";
+    const { target, meal } = mealCopy;
+    const { items, total } = mealCopyCandidates(data.foods, source, target, meal);
+    mealCopy.source = source;
+    mealCopy.ids = new Set(items.map((entry) => entry.id));
+    mealCopyStatus.textContent = "";
+    const list = document.querySelector("#meal-copy-list");
+    list.replaceChildren(...items.map(({ name, calories }) => {
+      const item = document.createElement("li");
+      item.textContent = name + " · " + format.format(calories) + " kcal";
+      return item;
+    }));
+    list.hidden = !items.length;
+    document.querySelector("#meal-copy-actions").hidden = !items.length;
+    const summary = document.querySelector("#meal-copy-summary");
+    if (!source) summary.textContent = "Wähle einen Tag vor dem Zieldatum.";
+    else if (items.length) summary.textContent = items.length + " Lebensmittel · " + format.format(totals(items).calories) + " kcal";
+    else summary.textContent = total ? "Die Lebensmittel von diesem Tag wurden bereits übernommen." : "An diesem Tag ist für diese Mahlzeit nichts eingetragen.";
+  }
+
+  function openMealCopy(meal, opener) {
+    const previous = new Date(nutritionDate);
+    previous.setDate(previous.getDate() - 1);
+    mealCopy = { meal, opener, target: keyForDate(nutritionDate) };
+    mealCopySource.max = keyForDate(previous);
+    mealCopySource.value = mealCopySource.max;
+    document.querySelector("#meal-copy-title").textContent = meal + " übernehmen";
+    document.querySelector("#meal-copy-target").textContent = "Eintragen für den " + nutritionDateLabel(mealCopy.target);
+    renderMealCopy();
+    showNutritionDialog(mealCopyDialog);
+  }
+
+  mealCopySource.addEventListener("change", renderMealCopy);
+  mealCopyDialog.addEventListener("close", () => {
+    if (mealCopyDialog.open) return;
+    document.getElementById(mealCopy?.opener)?.focus();
+    mealCopy = undefined;
+  });
+  mealCopyForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (!mealCopy || !mealCopyForm.reportValidity()) return;
+    const { meal, source, target, ids } = mealCopy;
+    if (!ids.size || source !== mealCopySource.value) return;
+    let count = 0;
+    const saved = commit((next) => {
+      const { items } = mealCopyCandidates(next.foods, source, target, meal);
+      const copies = items.filter((entry) => ids.has(entry.id)).map((entry) => ({
+        ...entry, id: crypto.randomUUID(), date: target, copiedFromId: entry.id,
+      }));
+      next.foods.push(...copies);
+      count = copies.length;
+    }, mealCopyStatus);
+    if (!saved) return;
+    if (!count) { renderMealCopy(); return; }
+    mealCopyDialog.close();
+    nutritionStatus.textContent = count + " Lebensmittel übernommen.";
   });
 
   openForm("#cardio-open", "#cardio-dialog", cardioForm, () => {
@@ -478,6 +621,8 @@ const dailyTracking = (() => {
       cardio: data.cardio.map(({ id, date, minutes }) => ({ id, date, value: minutes })),
     }),
     setAccount(id) {
+      if (foodDialog.open) foodDialog.close();
+      if (mealCopyDialog.open) mealCopyDialog.close();
       storageKey = id ? "fitness-app.daily.v1." + id : null;
       data = read();
       mobilityTimer = null;

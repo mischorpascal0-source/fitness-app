@@ -54,6 +54,7 @@
     <symbol id="icon-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v5m4-5v5"/></symbol>
     <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5 5"/></symbol>
     <symbol id="icon-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="icon-refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5M20 12a8 8 0 1 0-2.3 5.7"/></symbol>
     <symbol id="icon-rest" viewBox="0 0 24 24"><path d="M20.4 15.1A8.5 8.5 0 0 1 8.9 3.6a8.5 8.5 0 1 0 11.5 11.5Z"/></symbol>
   </svg>
   <main class="shell login-shell" id="login-view" aria-labelledby="login-title">
@@ -593,33 +594,66 @@
       <p class="planner-note form-status" role="status"></p>
     </form>
   </dialog>
-  <dialog id="food-dialog" aria-labelledby="food-title">
+  <dialog id="food-dialog" class="nutrition-dialog" aria-labelledby="food-title">
     <div class="detail-header"><h2 id="food-title">Essen eintragen</h2><form method="dialog"><button class="plan-button">Schließen</button></form></div>
-    <form id="food-lookup-form" class="food-lookup">
-      <label class="plan-editor-label">Lebensmittel suchen oder Barcode eingeben<input name="query" type="search" maxlength="80" required autocomplete="off" placeholder="z. B. Skyr oder EAN"></label>
-      <div class="planner-actions">
-        <button class="plan-button primary" type="submit">Suchen</button>
-        <button class="plan-button" id="food-scan-open" type="button" aria-haspopup="dialog">Barcode scannen</button>
+    <div class="nutrition-dialog-scroll">
+      <div id="food-entry">
+        <form id="food-lookup-form" class="food-lookup">
+          <label class="plan-editor-label">Lebensmittel oder Barcode suchen<input name="query" type="search" maxlength="80" required autocomplete="off" placeholder="z. B. Skyr oder EAN"></label>
+          <div class="food-lookup-actions">
+            <button class="plan-button primary" type="submit">Suchen</button>
+            <button class="plan-button" id="food-scan-open" type="button" aria-haspopup="dialog">Barcode scannen</button>
+          </div>
+          <p class="planner-note" id="food-lookup-status" role="status"></p>
+          <ul class="entry-list" id="food-lookup-results" aria-label="Gefundene Lebensmittel" hidden></ul>
+          <small class="planner-note">Produktdaten von <a href="https://world.openfoodfacts.org/data" target="_blank" rel="noopener noreferrer">Open Food Facts</a> unter <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener noreferrer">ODbL</a> · <a href="https://raw.githubusercontent.com/mischorpascal0-source/fitness-app/main/catalog/open-food-facts-de.csv.gz" target="_blank" rel="noopener noreferrer">Katalog herunterladen</a></small>
+        </form>
+        <form id="food-form" class="library-controls food-fields">
+          <div id="food-portion" class="full-row food-portion" hidden>
+            <label><span id="food-portion-label">Gegessene Menge in g</span><input name="amount" type="number" min="0.1" max="10000" step="any" value="100" inputmode="decimal" required disabled></label>
+            <p class="planner-note" id="food-portion-source"></p>
+            <button class="text-button" id="food-clear-selection" type="button">Auswahl lösen</button>
+          </div>
+          <label class="full-row">Lebensmittelname<input name="foodName" maxlength="100" placeholder="z. B. Haferflocken mit Joghurt" required></label>
+          <label id="food-date-field">Datum<input name="date" type="date" required></label>
+          <label>Mahlzeit<select name="meal"><option>Frühstück</option><option>Mittagessen</option><option>Abendessen</option><option>Snacks</option></select></label>
+          <fieldset class="food-fields full-row">
+            <legend>Nährwerte der Portion</legend>
+            <label>Kalorien in kcal<input name="calories" type="number" min="0" max="20000" step="1" inputmode="numeric" required></label>
+            <label>Protein in g<input name="protein" type="number" min="0" max="2000" step=".1" inputmode="decimal" value="0" required></label>
+            <label>Kohlenhydrate in g<input name="carbs" type="number" min="0" max="2000" step=".1" inputmode="decimal" value="0" required></label>
+            <label>Fett in g<input name="fat" type="number" min="0" max="2000" step=".1" inputmode="decimal" value="0" required></label>
+          </fieldset>
+        </form>
       </div>
-      <p class="planner-note" id="food-lookup-status" role="status"></p>
-      <ul class="entry-list" id="food-lookup-results" aria-label="Gefundene Lebensmittel" hidden></ul>
-      <small class="planner-note">Produktdaten von <a href="https://world.openfoodfacts.org/data" target="_blank" rel="noopener noreferrer">Open Food Facts</a> unter <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener noreferrer">ODbL</a> · <a href="https://raw.githubusercontent.com/mischorpascal0-source/fitness-app/main/catalog/open-food-facts-de.csv.gz" target="_blank" rel="noopener noreferrer">Katalog herunterladen</a></small>
-    </form>
-    <form id="food-form" class="library-controls">
-      <div id="food-portion" class="full-row food-portion" hidden>
-        <label class="plan-editor-label"><span id="food-portion-label">Gegessene Menge in g</span><input name="amount" type="number" min="0.1" max="10000" step="any" value="100" inputmode="decimal" required disabled></label>
-        <p class="planner-note" id="food-portion-source"></p>
-        <button class="text-button" id="food-clear-selection" type="button">Auswahl lösen</button>
+      <section id="food-saved" class="food-saved" aria-labelledby="food-saved-title" hidden>
+        <span class="icon-tile"><svg aria-hidden="true"><use href="#icon-check"/></svg></span>
+        <div><h3 id="food-saved-title">Eingetragen</h3><p id="food-saved-item" role="status"></p><p class="planner-note" id="food-saved-date"></p></div>
+      </section>
+    </div>
+    <div class="nutrition-dialog-footer">
+      <p class="planner-note" id="food-save-status" role="status"></p>
+      <button class="plan-button primary" id="food-submit" type="submit" form="food-form">Zum Tagebuch hinzufügen</button>
+      <div class="nutrition-dialog-actions" id="food-saved-actions" hidden>
+        <button class="plan-button" id="food-add-more" type="button">Weitere hinzufügen</button>
+        <form method="dialog"><button class="plan-button primary" type="submit">Fertig</button></form>
       </div>
-      <label class="full-row">Lebensmittel oder Mahlzeit <input name="foodName" maxlength="100" placeholder="z. B. Haferflocken mit Joghurt" required></label>
-      <label>Datum <input name="date" type="date" required></label>
-      <label>Mahlzeit <select name="meal"><option>Frühstück</option><option>Mittagessen</option><option>Abendessen</option><option>Snacks</option></select></label>
-      <label>Kalorien in kcal <input name="calories" type="number" min="0" max="20000" step="1" required></label>
-      <label>Protein in g <input name="protein" type="number" min="0" max="2000" step=".1" value="0" required></label>
-      <label>Kohlenhydrate in g <input name="carbs" type="number" min="0" max="2000" step=".1" value="0" required></label>
-      <label>Fett in g <input name="fat" type="number" min="0" max="2000" step=".1" value="0" required></label>
-      <button class="plan-button primary full-row" type="submit">Zum Tagebuch hinzufügen</button><p class="planner-note form-status full-row" role="status"></p>
-    </form>
+    </div>
+  </dialog>
+  <dialog id="meal-copy-dialog" class="nutrition-dialog" aria-labelledby="meal-copy-title">
+    <div class="detail-header"><h2 id="meal-copy-title">Mahlzeit übernehmen</h2><form method="dialog"><button class="plan-button">Schließen</button></form></div>
+    <div class="nutrition-dialog-scroll">
+      <p class="planner-note" id="meal-copy-target"></p>
+      <form id="meal-copy-form" class="library-controls">
+        <label class="full-row">Mahlzeit vom<input name="date" type="date" required></label>
+        <p class="planner-note full-row" id="meal-copy-summary" role="status"></p>
+        <ul class="entry-list full-row meal-copy-preview" id="meal-copy-list" aria-label="Lebensmittel zum Übernehmen" hidden></ul>
+      </form>
+    </div>
+    <div class="nutrition-dialog-footer" id="meal-copy-actions" hidden>
+      <p class="planner-note" id="meal-copy-status" role="status"></p>
+      <button class="plan-button primary" type="submit" form="meal-copy-form">Mahlzeit übernehmen</button>
+    </div>
   </dialog>
   <dialog id="food-scan-dialog" aria-labelledby="food-scan-title">
     <div class="detail-header"><h2 id="food-scan-title">Barcode scannen</h2><form method="dialog"><button class="plan-button">Schließen</button></form></div>
@@ -631,7 +665,7 @@
     <div class="detail-header"><h2 id="food-missing-title">Eigenes Lebensmittel</h2><form method="dialog"><button class="plan-button">Abbrechen</button></form></div>
     <p class="planner-note" id="food-missing-context"></p>
     <p class="planner-note">Barcode <strong id="food-missing-code"></strong></p>
-    <form class="library-controls" id="food-missing-form">
+    <form class="library-controls food-fields" id="food-missing-form">
       <label class="full-row">Produktname <input name="name" maxlength="100" required autofocus></label>
       <label class="full-row">Nährwerte auf dem Etikett pro <select name="unit"><option value="g">100 g</option><option value="ml">100 ml</option></select></label>
       <label>Energie in kcal <input name="kcal" type="number" min="0" max="2000" step="any" inputmode="decimal" required></label>
