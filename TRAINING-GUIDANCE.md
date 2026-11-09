@@ -7,11 +7,17 @@ Die Berechnung liegt vollständig in `training-guidance.js`. Sie ist determinist
 - Nur tatsächlich abgehakte Arbeitssätze derselben Übungs-ID, Gewichtsart, Gewichts-Konvention und Gerätekennung werden verwendet. Der Aufwärmsatz-Schalter schließt einen Satz von Vorschlägen und Trends aus. Im allgemeinen Trainingsprotokoll bleibt er als tatsächlich absolvierter Satz erhalten.
 - Kurzhantel: kg pro Hantel; Langhantel: Gesamtgewicht inklusive Stange; Maschine/Kabelzug/Multipresse: kg laut Anzeige. Für die letzten drei ist eine eigene Gerätekennung nötig. Die App kann nicht erkennen, ob zwei physische Geräte tatsächlich identisch sind; deshalb muss der Nutzer die Kennung passend vergeben.
 - Unterstützung ist Gegenlast: mehr Unterstützung ist leichter. Körpergewicht und Zusatzlast werden getrennt behandelt. Ohne Körpergewicht wird eine neue externe Last für einen anderen Wiederholungsbereich nicht aus Zusatzlast oder Unterstützung hochgerechnet.
-- Eigene Übungen ohne eindeutige Katalog-ID erhalten keine aus Namensähnlichkeit erfundenen Gewichte. Ältere Einträge ohne Einheitenkennung werden, soweit vergleichbar, mit einem Unsicherheitshinweis verwendet; unterschiedliche bekannte Konventionen werden getrennt.
+- Bei eigenen Übungen ohne Katalog-ID verwendet die App den exakten normalisierten Namen zusammen mit Equipment, Gewichtsart und Gerätekennung. Ältere Einträge ohne Einheitenkennung erhalten einen Unsicherheitshinweis.
 - Unvollständige/ungültige Werte, zukünftige Einträge und Einträge älter als 90 Tage sind ausgeschlossen. Zahlen müssen endlich sein; Gewicht 0–2000 kg, Wiederholungen 1–30. Bei externem Gewicht ist 0 kg kein Last-Referenzsatz. Für Umrechnungen oberhalb von 20 Referenz-Wiederholungen wird keine Last abgeleitet.
 - Bewusst reduzierte Übungen und Sätze mit dokumentierter Tagesanpassung dienen nicht als Leistungsreferenz. Beim Abhaken wird der damalige Kontext je Satz eingefroren. Spätere Bereichs- oder Geräteänderungen benennen bereits erledigte Sätze nicht rückwirkend um.
 
 ## Basisvorschlag
+
+Unter **Gewichtsangabe und Gerät einstellen** lassen sich Minimum, Maximum und Schrittweite der verfügbaren Stufen speichern. Das Maximum muss zum Raster ab dem Minimum passen. Die Stufen und Krafttests liegen im Trainingsspeicher des Kontos in diesem Browser. Die Gerätekennung ordnet sie beim nächsten Training wieder zu.
+
+Wenn vergleichbare Arbeitssätze fehlen, dient ein Krafttest mit 10–20 Wiederholungen als Startwert. Bei 25 kg × 15 ergibt die Schätzung für 8–12 Wiederholungen und 5-kg-Stufen einen Vorschlag von 30 kg × etwa 8. Für diese Erstkalibrierung gilt die normale Steigerungsgrenze von 10 % erst bei späterer Progression. Unter **Gespeicherte Trainings** stehen Krafttests in einem eigenen Abschnitt. Sobald vergleichbare Arbeitssätze vorliegen, liefern sie die Basis für weitere Vorschläge.
+
+**Übung zurücksetzen** entfernt nach Bestätigung die Satzdaten und Krafttests der ausgewählten Variante. Die App berechnet die betroffenen Trainingssummen neu und behält den Plan, die Gerätestufen und die Daten anderer Übungen.
 
 Bei Bereichswechsel wird der Epley-ähnliche Index `Gewicht × (1 + Wiederholungen / 30)` als einfache Näherung verwendet. Der Index wird auf die gewählte Zielwiederholungszahl zurückgerechnet. Er ist ausdrücklich keine Messung des 1RM und setzt ohne Anstrengungsangabe keine gesicherte Ausbelastung voraus.
 

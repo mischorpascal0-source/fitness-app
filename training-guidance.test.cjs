@@ -15,6 +15,33 @@ function visit(weight = 50, reps = 9, days = 1, fields = {}, setFields = {}) {
 }
 const suggest = (entry = exercise(), visits = [], ready = checkin()) => guidance.suggest(entry, visits, ready, now);
 
+test("a device-specific Krafttest gives 30 kg × 8 from 25 kg × 15 and yields to work history", () => {
+  const machine = exercise({ equipment: "Maschine", equipmentKey: "A" });
+  const key = guidance.scopeKey(machine);
+  const settings = { weightRanges: { [key]: guidance.weightRange(5, 95, 5) }, calibrations: [{ key, weight: 25, reps: 15, at: now - 1000 }] };
+  const result = guidance.suggest(machine, [], checkin(), now, settings);
+  assert.deepEqual(result.day, { weight: 30, reps: 8 });
+  assert.equal(result.trend.sessions, 0);
+  assert.equal(guidance.suggest({ ...machine, equipmentKey: "B" }, [], checkin(), now, settings).day.weight, null);
+  assert.equal(guidance.suggest(machine, [], checkin({ brust: 9 }), now, settings).day, null);
+  assert.deepEqual(guidance.suggest(machine, [visit(35, 8, 1, machine)], checkin(), now, settings).baseline, { weight: 35, reps: 9 });
+});
+
+test("bounded device weights use their minimum as origin and avoid a too-heavy test conversion", () => {
+  const machine = exercise({ equipment: "Maschine", equipmentKey: "A" });
+  const key = guidance.scopeKey(machine);
+  assert.equal(guidance.weightRange(5, 96, 5), null);
+  assert.deepEqual(guidance.weightRange(2.5, 15, 2.5), { min: 2.5, max: 15, step: 2.5 });
+  const settings = { weightRanges: { [key]: guidance.weightRange(5, 95, 15) }, calibrations: [{ key, weight: 20, reps: 15, at: now - 1000 }] };
+  assert.deepEqual(guidance.suggest(machine, [], checkin(), now, settings).day, { weight: 20, reps: 12 });
+  const offset = { weightRanges: { [key]: guidance.weightRange(2.5, 12.5, 5) } };
+  assert.equal(guidance.suggest(machine, [visit(11, 10, 1, machine)], checkin(), now, offset).day.weight, 7.5);
+  const assisted = { ...machine, loadMode: "assisted" };
+  const assistKey = guidance.scopeKey(assisted);
+  const assistSettings = { weightRanges: { [assistKey]: guidance.weightRange(5, 25, 5) }, calibrations: [{ key: assistKey, weight: 25, reps: 15, at: now - 1000 }] };
+  assert.equal(guidance.suggest(assisted, [], checkin({ brust: 5 }), now, assistSettings).day.weight, null);
+});
+
 test("missing history yields no invented weight and missing check-in yields no day prescription", () => {
   const result = suggest(); assert.equal(result.day.weight, null); assert.equal(result.trend.key, "insufficient");
   assert.equal(suggest(exercise(), [visit()], null).day, null);

@@ -56,24 +56,67 @@ const trainingGuidance = (() => {
   const ceilStep = (value, step) => Math.max(0, Number((Math.ceil((value - 1e-8) / step) * step).toFixed(4)));
   const indexScore = (weight, reps) => weight * (1 + reps / 30);
 
+  function exerciseIdentity(exercise) {
+    return exercise.id || `custom:${(exercise.name || "").trim().toLowerCase()}`;
+  }
+
+  function scopeKey(exercise, context) {
+    const p = { ...profile(exercise), ...context };
+    return JSON.stringify([exerciseIdentity(exercise), p.equipment, p.mode, p.convention, p.equipmentKey]);
+  }
+
+  function weightRange(min, max, step) {
+    if (![min, max, step].every(Number.isFinite) || min < 0 || max < min || max > 2000 || step < .1 || step > 100) return null;
+    const steps = (max - min) / step;
+    if (Math.abs(steps - Math.round(steps)) > 1e-8) return null;
+    return { min, max, step };
+  }
+
+  function roundWeight(value, p, direction) {
+    const min = p.min ?? 0, max = p.max ?? 2000;
+    const steps = (value - min) / p.step;
+    if ((direction === "floor" && value < min - 1e-8) || (direction === "ceil" && value > max + 1e-8)) return null;
+    const index = Math[direction](steps + (direction === "floor" ? 1e-8 : direction === "ceil" ? -1e-8 : 0));
+    const limit = Math.floor((max - min) / p.step + 1e-8);
+    return Number((min + Math.max(0, Math.min(index, limit)) * p.step).toFixed(8));
+  }
+
+  function validTestWeight(weight, p) {
+    if (!Number.isFinite(weight) || weight < (p.min ?? 0) || weight > (p.max ?? 2000)) return false;
+    if (p.mode === "bodyweight") return weight === 0;
+    if (p.mode === "external" && weight === 0) return false;
+    return Math.abs(weight - roundWeight(weight, p, "round")) < 1e-8;
+  }
+
+  function calibrationProposal(test, p, range) {
+    if (p.mode !== "external") {
+      return { weight: test.reps >= range.min ? test.weight : null, reps: Math.min(range.max, Math.max(range.min, test.reps)) };
+    }
+    const score = indexScore(test.weight, test.reps);
+    const targetWeight = score / (1 + range.min / 30);
+    let weight = roundWeight(targetWeight, p, "round");
+    const estimate = (load) => Math.round(30 * (score / load - 1));
+    if (weight > 0 && estimate(weight) < range.min) weight = roundWeight(targetWeight, p, "floor");
+    if (!(weight > 0) || estimate(weight) < range.min) return { weight: null, reps: range.min };
+    return { weight, reps: Math.min(range.max, estimate(weight)) };
+  }
+
   function history(exercise, workouts, now) {
     const current = profile(exercise), visits = [];
-    if (!exercise.id || (current.machine && !current.equipmentKey)) return visits;
+    if (current.machine && !current.equipmentKey) return visits;
+    const key = scopeKey(exercise);
     for (const workout of workouts) {
       const at = workout.completedAt ?? workout.startedAt ?? new Date(workout.date + "T12:00:00").getTime();
       if (!Number.isFinite(at) || at > now + 300000 || now - at > config.maxHistoryDays * 86400000) continue;
       const sets = [];
-      const entries = [...(workout.exercises || []), ...(workout.replacedExercises || [])];
+      const entries = [...(workout.exercises || []), ...(workout.replacedExercises || [])].filter((entry) => exerciseIdentity(entry) === exerciseIdentity(exercise));
       for (const entry of entries) {
-        if (entry.id !== exercise.id) continue;
-        const old = profile(entry);
-        if (old.equipment && old.equipment !== current.equipment) continue;
+        const recorded = { ...entry, equipment: entry.equipment || entry.type || current.equipment };
         for (let i = 0; i < (entry.done?.length ?? 0); i++) {
           const context = entry.setContexts?.[i] || {};
-          const saved = { ...old, ...context };
           const weight = entry.weights?.[i], reps = entry.setReps?.[i];
           if (!entry.done[i] || context.kind === "warmup" || entry.setTypes?.[i] === "warmup" || context.reduced || entry.deload || entry.dayAdjustment?.adjusted ||
-              saved.mode !== current.mode || saved.convention !== current.convention || saved.equipmentKey !== current.equipmentKey ||
+              scopeKey(recorded, context) !== key ||
               typeof weight !== "number" || !Number.isFinite(weight) || weight < 0 || weight > 2000 || !Number.isInteger(reps) || reps < 1 || reps > 30 ||
               (current.mode === "external" && weight === 0)) continue;
           const recordedRange = context.repRange || entry.repRange || inferRange(entry.reps ?? reps);
@@ -83,7 +126,8 @@ const trainingGuidance = (() => {
       if (sets.length) {
         const reference = [...sets].sort((a, b) => a.weight - b.weight || a.reps - b.reps)[Math.floor((sets.length - 1) / 2)];
         const comparable = sets.every((set) => set.range === rangeFor(exercise));
-        const complete = entries.filter((entry) => entry.id === exercise.id).every((entry) => !entry.archived && !entry.skipped && entry.done.every((done, i) => done || entry.setTypes?.[i] === "warmup"));
+        const complete = entries.filter((entry) => scopeKey({ ...entry, equipment: entry.equipment || entry.type || current.equipment }) === key)
+          .every((entry) => !entry.archived && !entry.skipped && entry.done.every((done, i) => done || entry.setTypes?.[i] === "warmup"));
         visits.push({ at, date: workout.date, sets, reference, comparable, complete,
           score: current.mode === "external" ? median(sets.map((set) => set.score)) : null });
       }
@@ -91,9 +135,14 @@ const trainingGuidance = (() => {
     return visits.sort((a, b) => b.at - a.at);
   }
 
-  function suggest(exercise, workouts, checkin, now = Date.now()) {
+  function suggest(exercise, workouts, checkin, now = Date.now(), settings = {}) {
     const p = profile(exercise), rangeKey = rangeFor(exercise), range = ranges[rangeKey];
+    const key = scopeKey(exercise);
+    const weights = settings.weightRanges?.[key];
+    if (weights && p.mode !== "bodyweight") Object.assign(p, weights);
     const visits = history(exercise, workouts, now), latest = visits[0], last = latest?.reference;
+    const canCalibrate = !(p.machine && !p.equipmentKey);
+    const test = canCalibrate ? settings.calibrations?.findLast((entry) => entry.key === key && Number.isFinite(entry.at) && entry.at <= now && now - entry.at <= config.maxHistoryDays * 86400000 && Number.isInteger(entry.reps) && entry.reps >= 10 && entry.reps <= 20 && validTestWeight(entry.weight, p)) : null;
     const workSetCount = exercise.done?.filter((_, index) => exercise.setTypes?.[index] !== "warmup").length
       ?? visits.find((visit) => visit.comparable && visit.complete)?.sets.length;
     const validTrend = visits.filter((visit) => visit.comparable && visit.complete && visit.sets.length === workSetCount && now - visit.at <= config.trendDays * 86400000);
@@ -140,15 +189,19 @@ const trainingGuidance = (() => {
           reps = range.min; reasons.push("Untergrenze wiederholt verfehlt: leichtere Last vorschlagen.");
         }
       }
-      if (weight != null && weight !== last.weight && p.mode !== "bodyweight") {
-        const raw = weight; weight = p.mode === "assisted" ? ceilStep(weight, p.step) : floorStep(weight, p.step);
-        if (raw > last.weight && p.mode !== "assisted" && weight <= last.weight) { weight = last.weight; reasons.push("Keine passende höhere Gewichtsstufe verfügbar; bisherige Last bleibt bestehen."); }
+      if (weight != null && (weight !== last.weight || weights) && p.mode !== "bodyweight") {
+        const raw = weight;
+        weight = weights ? roundWeight(weight, p, p.mode === "assisted" ? "ceil" : "floor") : p.mode === "assisted" ? ceilStep(weight, p.step) : floorStep(weight, p.step);
+        if (raw > last.weight && p.mode !== "assisted" && weight <= last.weight && (!weights || validTestWeight(last.weight, p))) { weight = last.weight; reasons.push("Keine passende höhere Gewichtsstufe verfügbar; bisherige Last bleibt bestehen."); }
         if (weight === 0 && p.mode === "external") weight = null;
       }
       if (last.reps > 12 || reps > 12) notes.push("Bei hohen Wiederholungszahlen ist die Lastschätzung besonders unsicher.");
       if (last.legacy) notes.push("Ältere Einträge ohne Einheitenkennung: Gewichtsangabe vor Übernahme prüfen.");
+    } else if (test) {
+      ({ weight, reps } = calibrationProposal(test, p, range));
+      reasons.push(weight == null ? "Keine passende Stufe aus dem Krafttest ableitbar. Gewicht selbst wählen." : "Startvorschlag aus deinem Krafttest.");
     } else {
-      reasons.push(p.machine && !p.equipmentKey ? "Gerätekennung eintragen; Gewichte verschiedener Maschinen werden nicht vermischt." : !exercise.id ? "Eigene Übung ohne eindeutige Katalog-ID: Gewicht selbst wählen." : "Keine aktuellen vergleichbaren Arbeitssätze vorhanden. Gewicht selbst wählen.");
+      reasons.push(p.machine && !p.equipmentKey ? "Gerätekennung eintragen; Gewichte verschiedener Maschinen werden nicht vermischt." : "Keine aktuellen vergleichbaren Arbeitssätze vorhanden. Gewicht selbst wählen oder einen Krafttest erfassen.");
       if (p.mode === "bodyweight") weight = 0;
     }
     if (p.mode === "external" && visits.length >= 2) {
@@ -165,11 +218,17 @@ const trainingGuidance = (() => {
     if (["unknown", "pain", "strong"].includes(rest.level)) day = null;
     else if (rest.level === "mild" || rest.level === "moderate" || exercise.deload) {
       const moderate = rest.level === "moderate" || exercise.deload;
-      if (day.weight != null && last) {
-        if (p.mode === "assisted") day.weight = ceilStep(Math.max(day.weight, last.weight) + (moderate ? p.step : 0), p.step);
-        else if (p.mode !== "bodyweight") day.weight = floorStep(Math.min(day.weight, last.weight) * (moderate ? config.moderateLoadFactor : 1), p.step);
+      const reference = last ?? test;
+      if (day.weight != null && reference) {
+        if (p.mode === "assisted") {
+          const adjusted = Math.max(day.weight, reference.weight) + (moderate ? p.step : 0);
+          day.weight = weights ? roundWeight(adjusted, p, "ceil") : ceilStep(adjusted, p.step);
+        } else if (p.mode !== "bodyweight") {
+          const adjusted = Math.min(day.weight, reference.weight) * (moderate ? config.moderateLoadFactor : 1);
+          day.weight = weights ? roundWeight(adjusted, p, "floor") : floorStep(adjusted, p.step);
+        }
       }
-      day.reps = Math.min(day.reps, last?.reps ?? day.reps, moderate ? range.min : day.reps);
+      day.reps = Math.min(day.reps, reference?.reps ?? day.reps, moderate ? range.min : day.reps);
       // Recovery is applied last. No inverse recalculation or extra sets compensate it.
       if (day.weight === 0 && p.mode === "external") day.weight = null;
       reasons.push(moderate ? "Heute leichter: Last und/oder Wiederholungen reduziert; keine zusätzlichen Sätze." : "Muskelkater: heute keine automatische Steigerung.");
@@ -178,8 +237,9 @@ const trainingGuidance = (() => {
     if (rest.level === "strong") reasons.push("Starker Muskelkater in beteiligten Muskeln: Pause, Auslassen oder eine unbelastete Alternative empfohlen.");
     if (rest.level === "pain") reasons.push("Ungewöhnliche Schmerzen oder Schwellung: betroffene Übung pausieren und gegebenenfalls fachlich abklären lassen.");
     return { schema: 1, at: now, range: rangeKey, profile: p, last: last ? { weight: last.weight, reps: last.reps, date: latest.date } : null,
+      test: test ? { weight: test.weight, reps: test.reps } : null, canCalibrate,
       trend, baseline, day, recovery: rest, confidence: weight == null || validTrend.length < 3 || last?.legacy || (last?.reps ?? 0) > 12 || reps > 12 ? "low" : "medium", reasons, notes };
   }
-  return { ranges, modes, config, muscleGroups, inferRange, rangeFor, profile, weightLabel, musclesFor, validateCheckin, recovery, suggest };
+  return { ranges, modes, config, muscleGroups, inferRange, rangeFor, profile, weightLabel, musclesFor, validateCheckin, recovery, scopeKey, weightRange, roundWeight, validTestWeight, suggest };
 })();
 if (typeof module !== "undefined") module.exports = trainingGuidance;

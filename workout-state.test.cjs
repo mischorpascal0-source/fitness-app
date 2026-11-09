@@ -1,6 +1,7 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const state = require("./workout-state.js");
+const guidance = require("./training-guidance.js");
 
 const active = () => state.normalize({ id: "session-a", date: "2026-11-05", startedAt: 1000, name: "Upper",
   exercises: [
@@ -16,6 +17,27 @@ test("legacy workouts receive stable IDs and editable set arrays without mutatin
   assert.deepEqual(first.exercises[0].weights, [""]);
   assert.equal(first.exerciseIndex, 0);
   assert.equal(input.id, undefined);
+});
+
+test("exercise reset removes the selected device's sets and test while preserving other sets and settings", () => {
+  const machine = { id: "ma-test", name: "Presse", equipment: "Maschine", equipmentKey: "A", reps: 10, muscles: ["Brust"],
+    done: [true, true], weights: [25, 40], setReps: [10, 8], setContexts: [{ equipmentKey: "a" }, { equipmentKey: "b" }] };
+  const other = { name: "Rudern", reps: 10, muscles: ["Rücken"], done: [true], weights: [20], setReps: [10] };
+  const key = guidance.scopeKey(machine), otherKey = guidance.scopeKey(machine, { equipmentKey: "b" });
+  const current = { ...active(), exercises: [machine, other], sourceSession: "saved plan" };
+  const saved = { ...current, completedAt: 61000, durationMs: 60000, totalSets: 3, volume: 770 };
+  const journal = { active: current, workouts: [saved], calibrations: [{ key }, { key: otherKey }], weightRanges: { [key]: { min: 5, max: 95, step: 5 } } };
+  const result = state.resetExercise(journal, key, new Map());
+  assert.deepEqual(result.calibrations, [{ key: otherKey }]);
+  assert.deepEqual(result.weightRanges, journal.weightRanges);
+  assert.deepEqual(result.active.exercises[0].weights, ["", 40]);
+  assert.deepEqual(result.active.exercises[1].weights, [20]);
+  assert.equal(result.active.sourceSession, "saved plan");
+  assert.deepEqual(result.workouts[0].exercises[0].weights, [40]);
+  assert.equal(result.workouts[0].totalSets, 2);
+  assert.equal(result.workouts[0].volume, 520);
+  assert.equal(result.workouts[0].durationMs, 60000);
+  assert.deepEqual(journal.active.exercises[0].weights, [25, 40]);
 });
 
 test("active duration and rest timer exclude repeated pauses, including time away from the app", () => {

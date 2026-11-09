@@ -70,7 +70,7 @@ const workoutState = (() => {
       exercise.done.forEach((done, index) => {
         if (done) result.volume += Number(exercise.weights[index] || 0) * Number(exercise.setReps[index]);
       });
-      for (const muscle of exercise.muscles) groups.set(muscle, (groups.get(muscle) ?? 0) + count);
+      for (const muscle of exercise.muscles ?? []) groups.set(muscle, (groups.get(muscle) ?? 0) + count);
     }
     result.muscleSets = [...groups].filter(([, count]) => count > 0);
     return result;
@@ -158,10 +158,10 @@ const workoutState = (() => {
     return copy;
   }
 
-  function prepareGuidance(active, workouts, catalog, now = Date.now()) {
+  function prepareGuidance(active, workouts, catalog, now = Date.now(), settings = {}) {
     const copy = normalize(active);
     for (const exercise of copy.exercises) {
-      exercise.guidance = guidance.suggest({ ...catalog.get(exercise.id), ...exercise }, workouts, copy.checkin, now);
+      exercise.guidance = guidance.suggest({ ...catalog.get(exercise.id), ...exercise }, workouts, copy.checkin, now, settings);
       for (let i = 0; i < exercise.done.length; i++) {
         if (!exercise.acceptedSuggestions[i] || exercise.done[i] || exercise.touchedWeights[i] || exercise.touchedReps[i] || exercise.setTypes[i] === "warmup") continue;
         const day = exercise.guidance.day;
@@ -194,6 +194,54 @@ const workoutState = (() => {
   function contextFor(exercise) {
     return { ...guidance.profile(exercise), kind: "work", repRange: guidance.rangeFor(exercise),
       reduced: Boolean(exercise.deload || exercise.guidance?.recovery.adjusted), proposal: null };
+  }
+
+  function resetExercise(journal, key, catalog, now = Date.now()) {
+    const setFields = ["done", "weights", "setReps", "touchedReps", "touchedWeights", "setTypes", "setContexts", "acceptedSuggestions"];
+    function matches(entry, index) {
+      return guidance.scopeKey({ ...catalog.get(entry.id), ...entry }, entry.setContexts?.[index]) === key;
+    }
+    function strip(entries) {
+      return (entries ?? []).flatMap((entry) => {
+        const keep = entry.done.map((_, index) => index).filter((index) => !matches(entry, index));
+        if (keep.length === entry.done.length) return [entry];
+        if (!keep.some((index) => entry.done[index])) return [];
+        const copy = { ...entry };
+        for (const field of setFields) if (entry[field]) copy[field] = keep.map((index) => entry[field][index]);
+        delete copy.guidance;
+        return [copy];
+      });
+    }
+    const next = {
+      ...journal,
+      calibrations: (journal.calibrations ?? []).filter((test) => test.key !== key),
+      workouts: journal.workouts.map((workout) => {
+        if (!workout.exercises) return workout;
+        const exercises = strip(workout.exercises), replacedExercises = strip(workout.replacedExercises);
+        if (exercises.length === workout.exercises.length && exercises.every((entry, index) => entry === workout.exercises[index]) &&
+            replacedExercises.length === (workout.replacedExercises?.length ?? 0) && replacedExercises.every((entry, index) => entry === workout.replacedExercises[index])) return workout;
+        const updated = { ...workout, exercises, replacedExercises };
+        const { durationMs, ...totals } = summary(updated);
+        return { ...updated, ...totals };
+      }),
+      active: normalize(journal.active),
+    };
+    if (next.active) {
+      for (const entry of next.active.exercises) {
+        for (let index = 0; index < entry.done.length; index++) {
+          if (!matches(entry, index)) continue;
+          entry.done[index] = false;
+          entry.weights[index] = "";
+          entry.setReps[index] = entry.reps;
+          entry.touchedReps[index] = entry.touchedWeights[index] = false;
+          entry.setTypes[index] = "work";
+          entry.setContexts[index] = entry.acceptedSuggestions[index] = null;
+        }
+      }
+      next.active.replacedExercises = strip(next.active.replacedExercises);
+      next.active = prepareGuidance(next.active, next.workouts, catalog, now, next);
+    }
+    return next;
   }
 
   function planUpdate(record, pending) {
@@ -230,6 +278,6 @@ const workoutState = (() => {
     return { ...journal, active: null, workouts: [...journal.workouts, workout], pendingPlanChanges };
   }
 
-  return { normalize, elapsed, pause, resume, summary, complete, planExercises, changes, resize, replace, move, planUpdate, prepareGuidance, acceptSuggestion, contextFor };
+  return { normalize, elapsed, pause, resume, summary, complete, planExercises, changes, resize, replace, move, planUpdate, prepareGuidance, acceptSuggestion, contextFor, resetExercise };
 })();
 if (typeof module !== "undefined") module.exports = workoutState;

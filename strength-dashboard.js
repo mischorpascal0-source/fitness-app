@@ -85,7 +85,7 @@ const strengthDashboard = (() => {
       if (!storageKey) return false;
       // An old tab must not resurrect a workout completed/discarded in another tab.
       const latest = readJournal();
-      if ((latest.active?.id ?? null) !== (journal?.active?.id ?? null)) {
+      if ((latest.active?.id ?? null) !== (journal?.active?.id ?? null) || (latest.revision ?? 0) !== (journal?.revision ?? 0)) {
         journal = latest;
         if (sheet.open) sheet.close();
         if (dialog.open) dialog.close();
@@ -93,6 +93,7 @@ const strengthDashboard = (() => {
         messageElement.textContent = "Die Einheit wurde in einem anderen Fenster geändert. Bitte öffne sie erneut.";
         return false;
       }
+      next = { ...next, revision: (latest.revision ?? 0) + 1 };
       localStorage.setItem(storageKey, JSON.stringify(next));
       journal = next;
       document.dispatchEvent(new Event("fitness:workoutchange"));
@@ -268,6 +269,15 @@ const strengthDashboard = (() => {
     }));
     const trainingDays = new Set(journal.workouts.map(({ date }) => date)).size;
     document.querySelector("#strength-streak").textContent = trainingDays ? trainingDays + " Trainingstage" : "";
+    const tests = (journal.calibrations ?? []).slice(-10).reverse();
+    document.querySelector("#strength-calibration-history").hidden = !tests.length;
+    document.querySelector("#strength-calibration-list").replaceChildren(...tests.map((test) => {
+      const row = node("li");
+      const name = node("strong", "", [test.name, test.device].filter(Boolean).join(" · "));
+      const detail = node("small", "", `${shortDate.format(test.at)} · ${guidancePair(test, test.profile)}`);
+      const copy = node("div"); copy.append(name, detail); row.append(copy);
+      return row;
+    }));
   }
 
   function render() {
@@ -392,8 +402,8 @@ const strengthDashboard = (() => {
     const label = node("label"), box = node("input"); box.type = "checkbox"; box.name = "painGroup"; box.value = group.id;
     label.append(box, group.label); document.querySelector("#workout-checkin-pain-groups").append(label);
   }
-  function refreshGuidance(active) {
-    return workoutState.prepareGuidance(active, journal.workouts, catalog);
+  function refreshGuidance(active, source = journal) {
+    return workoutState.prepareGuidance(active, source.workouts, catalog, Date.now(), source);
   }
   function toggleCheckinFields() {
     const sore = checkinForm.elements.soreness.value === "yes", pain = checkinForm.elements.pain.value === "yes";
@@ -451,14 +461,15 @@ const strengthDashboard = (() => {
     return `${weight} × ${pair.reps} Wdh.`;
   }
   function renderGuidance(exercise) {
-    const suggestion = exercise.guidance || trainingGuidance.suggest({ ...catalog.get(exercise.id), ...exercise }, journal.workouts, journal.active.checkin);
+    const suggestion = exercise.guidance || trainingGuidance.suggest({ ...catalog.get(exercise.id), ...exercise }, journal.workouts, journal.active.checkin, Date.now(), journal);
     const panel = node("section", "workout-guidance"); panel.setAttribute("aria-label", "Persönlicher Trainingsvorschlag");
     panel.append(node("span", "eyebrow", "Dein Trainingsvorschlag"));
     if (suggestion.last) panel.append(node("p", "planner-note", "Letztes vergleichbares Training: " + guidancePair(suggestion.last, suggestion.profile)));
-    if (suggestion.last) panel.append(node("p", "guidance-baseline", "Basis: " + guidancePair(suggestion.baseline, suggestion.profile)));
+    if (suggestion.test) panel.append(node("p", "planner-note", "Krafttest: " + guidancePair(suggestion.test, suggestion.profile)));
+    if (suggestion.last || suggestion.test) panel.append(node("p", "guidance-baseline", "Basis: " + guidancePair(suggestion.baseline, suggestion.profile)));
     const dayText = suggestion.recovery.level === "unknown" ? "Check-in ergänzen" : guidancePair(suggestion.day, suggestion.profile);
     panel.append(node("strong", "guidance-today", "Heute: " + dayText));
-    if (!suggestion.last) panel.append(node("p", "planner-note", suggestion.reasons[0]));
+    if (!suggestion.last && !suggestion.test) panel.append(node("p", "planner-note", suggestion.reasons[0]));
     panel.append(node("small", "guidance-confidence", suggestion.confidence === "low" ? "Unsichere Schätzung · bitte selbst prüfen" : "Orientierung aus deiner Trainingshistorie"));
     if (suggestion.recovery.affected.length) panel.append(node("p", "planner-note", "Beteiligte betroffene Bereiche: " + suggestion.recovery.affected.map((id) => trainingGuidance.muscleGroups.find((group) => group.id === id)?.label).join(", ")));
     const details = node("details", "workout-instructions"); details.id = "workout-guidance-reasons"; details.append(node("summary", "", "Warum dieser Vorschlag?"), node("p", "guidance-trend", suggestion.trend.label + ` · ${suggestion.trend.sessions} vergleichbare Einheiten`));
@@ -473,7 +484,56 @@ const strengthDashboard = (() => {
       if (saveActive(next)) { renderWorkout(); renderExercise(); sheetStatus.textContent = "Vorschlag in unbearbeitete Sätze übernommen. Erst abgehakte Sätze zählen als absolviert."; }
     });
     if (suggestion.day?.weight != null) panel.append(apply);
+    if (!suggestion.last && !suggestion.test && suggestion.canCalibrate && suggestion.day && !exercise.skipped && journal.active.pausedAt == null) {
+      panel.append(renderCalibration(exercise, suggestion.profile));
+    }
     return panel;
+  }
+
+  function renderCalibration(exercise, profile) {
+    const details = node("details", "workout-instructions");
+    details.append(node("summary", "", "Krafttest starten"), node("p", "planner-note", "Wähle eine Stufe für ungefähr 10–20 saubere Wiederholungen. Beende den Satz, sobald die nächste Wiederholung voraussichtlich nicht mehr sauber gelingt."));
+    const form = node("form", "workout-target-form"); form.id = "workout-calibration-form";
+    const weightLabel = node("label", "plan-editor-label", trainingGuidance.weightLabel({ ...catalog.get(exercise.id), ...exercise }));
+    const weight = node("input"); weight.type = "number"; weight.name = "testWeight"; weight.inputMode = "decimal";
+    weight.min = profile.min ?? 0; weight.max = profile.max ?? 2000; weight.step = profile.step; weight.required = true;
+    if (profile.mode === "bodyweight") { weight.value = 0; weight.readOnly = true; }
+    weightLabel.append(weight);
+    const repsLabel = node("label", "plan-editor-label", "Geschaffte Wiederholungen"), reps = node("input");
+    reps.type = "number"; reps.name = "testReps"; reps.min = 1; reps.max = 100; reps.inputMode = "numeric"; reps.required = true; repsLabel.append(reps);
+    const save = node("button", "plan-button primary", "Krafttest speichern"); save.type = "submit";
+    const skip = node("button", "text-button", "Krafttest überspringen"); skip.type = "button";
+    skip.addEventListener("click", () => { details.open = false; details.querySelector("summary").focus(); });
+    const feedback = node("p", "planner-note workout-target-note"); feedback.setAttribute("role", "status");
+    form.append(weightLabel, repsLabel, save, skip, feedback); details.append(form);
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const current = currentExercise();
+      if (current?.instanceId !== exercise.instanceId || !current.guidance?.day || journal.active.pausedAt != null) return;
+      const load = weight.valueAsNumber, count = reps.valueAsNumber;
+      if (!trainingGuidance.validTestWeight(load, profile)) {
+        feedback.textContent = "Wähle ein verfügbares Testgewicht.";
+        return;
+      }
+      if (count < 10 || count > 20) {
+        const heavier = count > 20;
+        const sign = profile.mode === "assisted" ? -1 : 1;
+        const adjusted = trainingGuidance.roundWeight(load + (heavier ? sign : -sign) * profile.step, profile, "round");
+        const alternative = profile.mode !== "bodyweight" && adjusted !== load && trainingGuidance.validTestWeight(adjusted, profile);
+        if (alternative) {
+          weight.value = adjusted;
+          reps.value = "";
+          feedback.textContent = `Für einen neuen Versuch ist ${numberFormat.format(adjusted)} kg vorausgewählt.`;
+        } else feedback.textContent = "Für diesen Test gibt es keine passendere Gewichtsstufe. Du kannst den Krafttest überspringen und Sätze manuell erfassen.";
+        return;
+      }
+      const key = trainingGuidance.scopeKey({ ...catalog.get(current.id), ...current });
+      const test = { key, at: Date.now(), name: current.name, device: current.equipmentKey, weight: load, reps: count, profile: { mode: profile.mode } };
+      const next = { ...journal, calibrations: [...(journal.calibrations ?? []), test] };
+      next.active = refreshGuidance(journal.active, next);
+      if (writeJournal(next, feedback)) { renderWorkout(); renderExercise(); }
+    });
+    return details;
   }
 
   function saveActive(active) {
@@ -647,28 +707,78 @@ const strengthDashboard = (() => {
     });
     const advanced = node("details", "workout-instructions guidance-profile"); advanced.append(node("summary", "", "Gewichtsangabe und Gerät einstellen"));
     const stepLabel = node("label", "plan-editor-label", "Verfügbarer Gewichtsschritt in kg"), step = node("input");
-    step.type = "number"; step.name = "weightStep"; step.min = .1; step.max = 100; step.step = "any"; step.required = true; step.value = profile.step; stepLabel.append(step);
+    step.type = "number"; step.name = "weightStep"; step.inputMode = "decimal"; step.min = .1; step.max = 100; step.step = "any"; step.required = true; step.value = profile.step; stepLabel.append(step);
     const modeLabel = node("label", "plan-editor-label", "Gewichtsart"), mode = node("select"); mode.name = "loadMode";
     mode.append(...Object.entries(trainingGuidance.modes).map(([key, text]) => new Option(text, key))); mode.value = profile.mode; modeLabel.append(mode);
     const deviceLabel = node("label", "plan-editor-label", "Gerätekennung / Variante"), device = node("input"); device.name = "equipmentKey"; device.maxLength = 80; device.value = exercise.equipmentKey || ""; device.placeholder = "z. B. Brustpresse A im Studio"; deviceLabel.append(device);
+    const bounds = [["weightMin", "Kleinstes verfügbares Gewicht in kg"], ["weightMax", "Größtes verfügbares Gewicht in kg"]].map(([name, text]) => {
+      const label = node("label", "plan-editor-label", text), input = node("input");
+      input.name = name; input.type = "number"; input.inputMode = "decimal"; input.min = 0; input.max = 2000; input.step = "any";
+      label.append(input); return { label, input };
+    });
+    const [min, max] = bounds.map(({ input }) => input);
+    const preview = node("p", "planner-note");
+    const enteredRange = () => trainingGuidance.weightRange(min.valueAsNumber, max.valueAsNumber, step.valueAsNumber);
+    function renderWeightPreview() {
+      const range = enteredRange();
+      if (!range) { preview.textContent = "Minimum und Maximum gemeinsam eingeben. Das Maximum muss auf einer verfügbaren Stufe liegen."; return; }
+      const count = Math.round((range.max - range.min) / range.step) + 1;
+      const first = Array.from({ length: Math.min(4, count) }, (_, index) => numberFormat.format(range.min + index * range.step));
+      preview.textContent = `Verfügbare Stufen · ${first.join(" · ")}${count > 4 ? " … " + numberFormat.format(range.max) : ""} kg`;
+    }
+    const keyFor = () => trainingGuidance.scopeKey({ ...catalog.get(exercise.id), ...exercise, loadMode: mode.value, equipmentKey: device.value });
+    let displayedWeightKey;
+    function loadWeightRange() {
+      const key = keyFor();
+      if (key === displayedWeightKey) return;
+      displayedWeightKey = key;
+      const saved = journal.weightRanges?.[key];
+      min.value = saved?.min ?? "";
+      max.value = saved?.max ?? "";
+      step.value = saved?.step ?? profile.step;
+      const fixed = mode.value === "bodyweight";
+      min.disabled = max.disabled = step.disabled = fixed;
+      preview.hidden = fixed;
+      renderWeightPreview();
+    }
+    for (const input of [min, max, step]) input.addEventListener("input", renderWeightPreview);
+    device.addEventListener("change", loadWeightRange); mode.addEventListener("change", loadWeightRange);
+    loadWeightRange();
+    const reset = node("button", "plan-button", "Übung zurücksetzen"); reset.type = "button"; reset.id = "workout-reset-exercise";
+    reset.addEventListener("click", () => {
+      const current = currentExercise();
+      if (current?.instanceId !== exercise.instanceId) return;
+      const scope = [current.name, current.equipmentKey, trainingGuidance.modes[profile.mode]].filter(Boolean).join(" · ");
+      if (!window.confirm(`„${scope}“ zurücksetzen? Die Satzdaten und Krafttests dieser Variante werden im aktuellen Training und in der Historie gelöscht.`)) return;
+      const key = trainingGuidance.scopeKey({ ...catalog.get(current.id), ...current });
+      const next = workoutState.resetExercise(journal, key, catalog);
+      if (writeJournal(next, sheetStatus)) { render(); renderWorkout(); renderExercise(); sheetStatus.textContent = "Übung zurückgesetzt. Du kannst einen neuen Krafttest erfassen."; }
+    });
     const deloadLabel = node("label", "guidance-checkbox"), deload = node("input"); deload.name = "deload"; deload.type = "checkbox"; deload.checked = Boolean(exercise.deload);
     deloadLabel.append(deload, "Heute bewusst leichter trainieren (nicht für den Leistungstrend)");
-    advanced.append(stepLabel, modeLabel, deviceLabel, node("p", "planner-note", "Für Maschine, Kabelzug und Multipresse ist eine Gerätekennung für Gewichtsvorschläge nötig. Kurzhantel: kg pro Hantel. Langhantel: Gesamtgewicht inklusive Stange."), deloadLabel);
+    advanced.append(modeLabel, deviceLabel, ...bounds.map(({ label }) => label), stepLabel, preview, node("p", "planner-note", "Für Maschine, Kabelzug und Multipresse ist eine Gerätekennung für Gewichtsvorschläge nötig. Kurzhantel: kg pro Hantel. Langhantel: Gesamtgewicht inklusive Stange."), deloadLabel, reset);
     form.append(advanced);
     const apply = node("button", "plan-button", "Vorgaben übernehmen"); apply.type = "submit"; form.append(apply);
     form.append(node("p", "planner-note workout-target-note", "Entfernte offene Sätze verlieren ihre Eingaben. Tatsächlich eingegebene Werte und erledigte Sätze bleiben erhalten."));
     form.addEventListener("submit", (event) => {
       event.preventDefault(); if (!form.reportValidity() || !currentExercise()) return;
       try {
+        const range = mode.value === "bodyweight" ? null : enteredRange();
+        if (mode.value !== "bodyweight" && (min.value || max.value) && !range) throw new Error("Gib Minimum, Maximum und Gewichtsschritt passend zu den verfügbaren Stufen ein.");
         const settings = {
           repRange: exercise.repRange !== undefined || rangeSelect.value !== currentRange ? rangeSelect.value : undefined,
-          weightStep: exercise.weightStep !== undefined || step.valueAsNumber !== profile.step ? step.valueAsNumber : undefined,
+          weightStep: !range && mode.value !== "bodyweight" && step.valueAsNumber !== profile.step ? step.valueAsNumber : exercise.weightStep,
           loadMode: exercise.loadMode !== undefined || mode.value !== profile.mode ? mode.value : undefined,
           equipmentKey: exercise.equipmentKey !== undefined || device.value.trim() ? device.value.trim() : undefined,
         };
         const next = workoutState.resize(journal.active, exercise.instanceId, form.elements.sets.valueAsNumber, form.elements.reps.valueAsNumber, settings);
         next.exercises.find(({ instanceId }) => instanceId === exercise.instanceId).deload = deload.checked;
-        if (saveActive(refreshGuidance(next))) { renderWorkout(); renderExercise(); sheetStatus.textContent = "Zielvorgaben gespeichert und Tagesvorschlag aktualisiert. Tatsächliche Werte bleiben erhalten."; }
+        const weightRanges = { ...journal.weightRanges };
+        if (range) weightRanges[keyFor()] = range;
+        else delete weightRanges[keyFor()];
+        const updated = { ...journal, weightRanges };
+        updated.active = refreshGuidance(next, updated);
+        if (writeJournal(updated, sheetStatus)) { renderWorkout(); renderExercise(); sheetStatus.textContent = "Vorgaben gespeichert und Tagesvorschlag aktualisiert."; }
       } catch (error) { sheetStatus.textContent = error.message; }
     });
     return form;
