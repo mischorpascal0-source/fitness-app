@@ -1109,6 +1109,31 @@ a.plan-button { display: inline-flex; align-items: center; text-decoration: none
 .calendar-day.is-completed .calendar-dot { background: var(--accent-blue); }
 .calendar-day.is-planned .calendar-dot { background: var(--accent); }
 .calendar-day[aria-pressed="true"] .calendar-dot { background: #4B466F; }
+
+@media (max-width: 40rem) {
+  .calendar-panel { padding: var(--space-2); }
+  .calendar-panel .section-heading { margin-bottom: var(--space-1); }
+  .calendar-day { align-content: center; gap: .125rem; min-height: 3.25rem; padding-block: .1875rem; }
+  .calendar-day strong { min-height: 1.375rem; width: 1.5rem; }
+  .calendar-footer { margin-top: .375rem; padding-top: .125rem; }
+  .calendar-footer .text-button { min-width: 2.75rem; }
+
+  .diary-calendar-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: .25rem;
+  }
+  .diary-calendar-panel .section-heading,
+  .diary-calendar-panel .calendar-footer { display: contents; }
+  .diary-calendar-panel [data-calendar-selected],
+  .diary-calendar-panel .calendar-month { display: none; }
+  .diary-calendar-panel .date-control { grid-area: 1 / 1; }
+  .diary-calendar-panel .date-control input { width: 100%; }
+  .diary-calendar-panel .calendar-actions { grid-area: 1 / 2; }
+  .diary-calendar-panel [data-calendar-today] { grid-area: 1 / 3; }
+  .diary-calendar-panel .week-calendar { grid-area: 2 / 1 / 3 / -1; }
+}
 .training-day-note { margin: 0; color: var(--muted); font-size: .75rem; }
 .session-card { position: relative; display: block; min-width: 0; min-height: 13rem; padding: var(--space-4); border-radius: var(--radius-card); color: var(--text); text-decoration: none; }
 #strength-session-card { background: radial-gradient(ellipse at 100% 0, rgb(163 152 243 / .16), transparent 70%), var(--surface-gradient); border-color: #6C739F; }
