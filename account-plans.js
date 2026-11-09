@@ -306,11 +306,14 @@
     location.hash = "#trainingsplan";
     requestAnimationFrame(trainingPlanner.focusPlan);
   });
-  deleteButton.addEventListener("click", () => {
-    if (!selected || !window.confirm(`„${selected.plan.name}“ aus deinem Konto löschen?`)) return;
+  deleteButton.addEventListener("click", async () => {
+    const record = selected, owner = account?.id;
+    if (!record || !await actionDialog.confirm(deleteButton, "Trainingsplan löschen",
+      `„${record.plan.name}“ wird aus deinem Konto gelöscht.`, "Plan löschen")) return;
+    if (selected !== record || account?.id !== owner) return;
     perform(async () => {
-      await api(`/api/plans/${selected.id}`, "DELETE", { version: selected.version });
-      plans = plans.filter(({ id }) => id !== selected.id);
+      await api(`/api/plans/${record.id}`, "DELETE", { version: record.version });
+      plans = plans.filter(({ id }) => id !== record.id);
       await selectPlan(null);
       await selectPlan(plans[0]?.id);
       status.textContent = "Plan gelöscht.";
@@ -337,8 +340,11 @@
     });
   });
   retry.addEventListener("click", flush);
-  reload.addEventListener("click", () => {
-    if (!window.confirm("Offene Änderungen verwerfen und den Serverstand laden?")) return;
+  reload.addEventListener("click", async () => {
+    const owner = account?.id;
+    if (!await actionDialog.confirm(reload, "Serverstand laden",
+      "Deine offenen Planänderungen werden verworfen. Die App lädt den gespeicherten Plan aus deinem Konto.", "Serverstand laden")) return;
+    if (account?.id !== owner) return;
     perform(async () => {
       const { user } = await api("/api/session");
       await setAccount(user);

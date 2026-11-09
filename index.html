@@ -15,6 +15,7 @@
   <script src="catalog-search.js" defer></script>
   <script src="plan-data.js" defer></script>
   <script src="plan-generator.js" defer></script>
+  <script src="action-dialog.js" defer></script>
   <script src="training-planner.js" defer></script>
   <script src="exercise-library.js" defer></script>
   <script src="training-guidance.js" defer></script>
@@ -385,15 +386,13 @@
         <h2>Eigenen Plan erstellen</h2>
         <div class="library-controls planner-settings">
           <label>Planname <input name="planName" type="text" maxlength="100" required placeholder="z. B. Mein Trainingsplan"></label>
+          <label>Einheiten pro Woche <select name="manualDays"></select></label>
         </div>
-        <details class="plan-equipment">
-          <summary>Trainingstage festlegen</summary>
-          <fieldset class="training-days">
-            <legend>Wochentage</legend>
-            <div id="plan-manual-weekdays" class="plan-equipment-options"></div>
-            <p class="planner-note">Für jeden ausgewählten Tag wird eine leere Einheit angelegt.</p>
-          </fieldset>
-        </details>
+        <fieldset class="training-days" aria-describedby="plan-manual-weekdays-hint">
+          <legend>Trainingstage</legend>
+          <div id="plan-manual-weekdays" class="plan-equipment-options weekday-options"></div>
+          <p id="plan-manual-weekdays-hint" class="planner-note" role="status"></p>
+        </fieldset>
         <div class="planner-actions"><button class="plan-button" type="submit">Leeren Plan anlegen</button></div>
       </form>
       <p id="plan-status" class="planner-note" role="status"></p>
@@ -562,8 +561,8 @@
         </div>
         <fieldset class="training-days" aria-describedby="plan-weekdays-hint">
           <legend>Trainingstage</legend>
-          <div id="plan-weekdays" class="plan-equipment-options"></div>
-          <p id="plan-weekdays-hint" class="planner-note"></p>
+          <div id="plan-weekdays" class="plan-equipment-options weekday-options"></div>
+          <p id="plan-weekdays-hint" class="planner-note" role="status"></p>
         </fieldset>
         <div class="plan-duration">
           <div class="plan-duration-heading">
@@ -593,6 +592,15 @@
       </div>
     </form>
   </dialog>
+  <dialog id="action-dialog" aria-labelledby="action-dialog-title" aria-describedby="action-dialog-message">
+    <div class="detail-header"><h2 id="action-dialog-title"></h2></div>
+    <p id="action-dialog-message"></p>
+    <form method="dialog" class="planner-actions">
+      <button class="plan-button" value="cancel" autofocus>Abbrechen</button>
+      <button class="plan-button primary" value="confirm"></button>
+    </form>
+  </dialog>
+
   <dialog id="plan-add-dialog" aria-labelledby="plan-add-title">
     <div class="detail-header">
       <h2 id="plan-add-title">Übung hinzufügen</h2>

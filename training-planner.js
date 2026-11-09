@@ -12,6 +12,9 @@ const trainingPlanner = (() => {
   const weekdayOptions = document.querySelector("#plan-weekdays");
   const weekdayHint = document.querySelector("#plan-weekdays-hint");
   const manualForm = document.querySelector("#plan-manual-form");
+  const manualDays = manualForm.elements.manualDays;
+  const manualWeekdays = document.querySelector("#plan-manual-weekdays");
+  const manualHint = document.querySelector("#plan-manual-weekdays-hint");
   const equipmentOptions = settings.querySelector(".plan-equipment .plan-equipment-options");
   const equipmentCount = settings.querySelector("#plan-equipment-count");
   const status = document.querySelector("#plan-status");
@@ -34,6 +37,7 @@ const trainingPlanner = (() => {
   let workspace;
   let localPlan = readLocal();
   let plan = localPlan;
+  const draftDays = new Map();
   let creating = false;
   let plannerStep = 0;
 
@@ -69,7 +73,10 @@ const trainingPlanner = (() => {
   }
 
   function updateDays() {
-    days.replaceChildren(...splits[split.value].days.map((day) => new Option(String(day), String(day))));
+    const previous = days.value;
+    const counts = splits[split.value].days.map(String);
+    days.replaceChildren(...counts.map((count) => new Option(count, count)));
+    if (counts.includes(previous)) days.value = previous;
     updateWeekdayHint();
   }
 
@@ -88,9 +95,41 @@ const trainingPlanner = (() => {
     });
   }
 
+  function updateDayChoices(container, hint, count) {
+    const inputs = [...container.querySelectorAll("input")];
+    const selected = checkedWeekdays(container).length;
+    inputs.forEach((input) => { input.disabled = !input.checked && selected >= count; });
+    const remaining = count - selected;
+    const help = remaining > 0 ? (remaining === 1 ? "Wähle noch einen Tag." : `Wähle noch ${remaining} Tage.`)
+      : remaining < 0 ? (remaining === -1 ? "Wähle einen Tag ab." : `Wähle ${-remaining} Tage ab.`)
+      : "Wähle einen markierten Tag ab, um ihn zu wechseln.";
+    hint.textContent = `${selected} von ${count} Trainingstagen ausgewählt. ${help}`;
+  }
+
   function updateWeekdayHint() {
-    const selected = weekdayOptions.querySelectorAll(":checked").length;
-    weekdayHint.textContent = `Wähle ${days.value} feste Wochentage. ${selected} ausgewählt. Dein Plan wiederholt sich jede Woche. Du kannst die Tage später pro Einheit ändern.`;
+    updateDayChoices(weekdayOptions, weekdayHint, Number(days.value));
+  }
+
+  function updateManualHint() {
+    updateDayChoices(manualWeekdays, manualHint, Number(manualDays.value));
+  }
+
+  function scheduledDay(session) {
+    return draftDays.has(session) ? draftDays.get(session) : session.weekday;
+  }
+
+  function scheduleComplete(sessions, getDay = ({ weekday }) => weekday) {
+    const days = sessions.map(getDay);
+    return days.length > 0 && new Set(days).size === days.length &&
+      days.every((day) => Number.isInteger(day) && day >= 0 && day < weekdays.length);
+  }
+
+  function applySchedule() {
+    if (!scheduleComplete(plan.sessions, scheduledDay)) return false;
+    for (const [session, day] of draftDays) session.weekday = day;
+    draftDays.clear();
+    applyWeekdays();
+    return true;
   }
 
   function applyWeekdays() {
@@ -138,6 +177,10 @@ const trainingPlanner = (() => {
 
   function save(message) {
     const snapshot = normalizePlan(plan);
+    if (!snapshot || !scheduleComplete(snapshot.sessions)) {
+      status.textContent = "Ordne jeder Einheit einen eigenen Trainingstag zu, um den Plan zu speichern.";
+      return;
+    }
     if (workspace) {
       workspace.save(snapshot, message);
     } else {
@@ -376,15 +419,53 @@ const trainingPlanner = (() => {
     nameLabel.append(name);
     const summary = document.createElement("p");
     summary.className = "planner-note";
-    summary.textContent = plan.sessions.length === 1 ? "1 Einheit" : `${plan.sessions.length} Einheiten`;
+    summary.id = "plan-schedule-summary";
+    summary.setAttribute("role", "status");
+    const addDayLabel = document.createElement("label");
+    addDayLabel.className = "plan-editor-label";
+    addDayLabel.textContent = "Trainingstag für neue Einheit";
+    const addDay = document.createElement("select");
+    addDay.className = "plan-new-session-day";
+    addDayLabel.append(addDay);
     const addSession = document.createElement("button");
     addSession.type = "button";
     addSession.className = "plan-button plan-add-session";
     addSession.textContent = "Einheit hinzufügen";
-    addSession.disabled = plan.sessions.length >= limits.sessions;
+    const dayFields = [];
+
+    function updateScheduleControls() {
+      const selected = new Set(plan.sessions.map(scheduledDay).filter(Number.isInteger));
+      const count = plan.sessions.length;
+      const missing = count - selected.size;
+      const hint = count > weekdays.length ? "Entferne Einheiten, bis es höchstens sieben sind."
+        : missing > 0 ? "Ordne den übrigen Einheiten eigene Wochentage zu."
+        : "Zum Tauschen zweier Tage wähle zuerst einen davon ab.";
+      summary.textContent = `${selected.size} von ${count} Trainingstagen ausgewählt. ${hint}`;
+      for (const [session, select] of dayFields) {
+        const current = scheduledDay(session);
+        select.value = current ?? "";
+        select.options[0].textContent = current == null ? "Tag auswählen" : "Tag abwählen";
+        for (const option of [...select.options].slice(1)) {
+          const day = Number(option.value);
+          option.disabled = day !== current && selected.has(day);
+        }
+      }
+      const previous = addDay.value;
+      const free = weekdays.map((label, day) => [day, label]).filter(([day]) => !selected.has(day));
+      addDayLabel.hidden = addSession.hidden = !free.length;
+      addDay.replaceChildren(new Option("Tag auswählen", ""));
+      fillSelect(addDay, free);
+      addDay.value = free.some(([day]) => String(day) === previous) ? previous : "";
+      addDay.disabled = missing > 0;
+      addSession.disabled = addDay.disabled || addDay.value === "";
+    }
+
+    addDay.addEventListener("change", () => { addSession.disabled = addDay.value === ""; });
     addSession.addEventListener("click", () => {
+      if (addSession.disabled) return;
       const index = plan.sessions.length;
-      plan.sessions.push({ name: `Einheit ${index + 1}`, exercises: [] });
+      plan.sessions.push({ name: `Einheit ${index + 1}`, weekday: Number(addDay.value), exercises: [] });
+      applyWeekdays();
       renderPlan(`[data-session-index="${index}"] .plan-session-name`);
       save("Einheit hinzugefügt.");
     });
@@ -396,7 +477,7 @@ const trainingPlanner = (() => {
     const actions = document.createElement("div");
     actions.className = "plan-order-controls";
     actions.append(addSession, exportButton);
-    header.append(nameLabel, summary, actions);
+    header.append(nameLabel, summary, addDayLabel, actions);
     result.append(header);
 
     plan.sessions.forEach((session, index) => {
@@ -405,15 +486,18 @@ const trainingPlanner = (() => {
       card.querySelector(".session-label").textContent = `Einheit ${index + 1}`;
       watchName(card.querySelector(".plan-session-name"), session, `Name der Einheit ${index + 1}`);
       const weekday = card.querySelector(".plan-session-weekday");
-      weekday.add(new Option("Ohne festen Tag", ""));
+      weekday.add(new Option("Tag auswählen", ""));
       fillSelect(weekday, weekdays.map((label, value) => [value, label]));
-      weekday.value = session.weekday ?? "";
       weekday.setAttribute("aria-label", `Trainingstag für Einheit ${index + 1}`);
+      weekday.setAttribute("aria-describedby", summary.id);
+      dayFields.push([session, weekday]);
       weekday.addEventListener("change", () => {
-        if (weekday.value === "") delete session.weekday;
-        else session.weekday = Number(weekday.value);
-        applyWeekdays();
-        save("Trainingstag gespeichert.");
+        if (!weekday.selectedOptions[0]?.disabled) draftDays.set(session, weekday.value === "" ? null : Number(weekday.value));
+        if (applySchedule()) {
+          save("Trainingstage gespeichert.");
+          document.dispatchEvent(new Event("fitness:planchange"));
+        }
+        updateScheduleControls();
       });
       const list = card.querySelector("ul");
       const time = card.querySelector(".plan-session-time");
@@ -423,14 +507,22 @@ const trainingPlanner = (() => {
       card.querySelector(".plan-session-empty").hidden = session.exercises.length > 0;
       card.querySelector(".plan-add-button").addEventListener("click", () => openExercisePicker(session));
       bindSessionOrder(card, index);
-      card.querySelector(".plan-session-remove").addEventListener("click", () => {
-        if (session.exercises.length && !window.confirm(`„${session.name}“ mit allen Übungen entfernen?`)) return;
-        plan.sessions.splice(index, 1);
-        renderPlan(".plan-add-session");
+      const remove = card.querySelector(".plan-session-remove");
+      remove.disabled = plan.sessions.length === 1;
+      remove.addEventListener("click", async () => {
+        if (session.exercises.length && !await actionDialog.confirm(remove, "Einheit löschen",
+          `„${session.name}“ wird mit allen Übungen aus dem Plan entfernt.`, "Einheit löschen")) return;
+        const currentIndex = plan?.sessions.indexOf(session) ?? -1;
+        if (currentIndex < 0 || plan.sessions.length === 1) return;
+        plan.sessions.splice(currentIndex, 1);
+        draftDays.delete(session);
+        if (!applySchedule()) applyWeekdays();
+        renderPlan(addDay.disabled ? ".plan-session-weekday" : ".plan-new-session-day");
         save("Einheit entfernt.");
       });
       result.append(card);
     });
+    updateScheduleControls();
     if (focusSelector) {
       const control = result.querySelector(focusSelector);
       const fallback = control?.closest(".plan-exercise, .plan-editor-heading")?.querySelector("input");
@@ -512,8 +604,16 @@ const trainingPlanner = (() => {
 
   async function createPlan(nextPlan, messages, dialogStatus) {
     if (creating) return;
-    if (!workspace && plan && !window.confirm("Den aktuellen lokalen Plan durch einen neuen Plan ersetzen?")) return;
+    if (!scheduleComplete(nextPlan.sessions)) {
+      (dialogStatus ?? status).textContent = "Ordne jeder Einheit einen eigenen Trainingstag zu, um den Plan zu speichern.";
+      return;
+    }
     const currentWorkspace = workspace;
+    const currentPlan = plan;
+    const trigger = dialogStatus ? document.querySelector("#planner-submit") : manualForm.querySelector("button[type=submit]");
+    if (!currentWorkspace && currentPlan && !await actionDialog.confirm(trigger, "Lokalen Plan ersetzen",
+      `Der neue Plan ersetzt „${currentPlan.name}“ in diesem Browser.`, "Plan ersetzen")) return;
+    if (workspace !== currentWorkspace || plan !== currentPlan) return;
     if (currentWorkspace) {
       creating = true;
       try {
@@ -526,6 +626,7 @@ const trainingPlanner = (() => {
       }
     }
     plan = nextPlan;
+    draftDays.clear();
     applyWeekdays();
     renderPlan();
     renderNotices(messages);
@@ -553,9 +654,13 @@ const trainingPlanner = (() => {
   fillSelect(addEquipment, equipment.map((type) => [type, type]));
   fillSelect(addForm.elements.customEquipment, equipment.map((type) => [type, type]));
 
-  const manualWeekdays = document.querySelector("#plan-manual-weekdays");
   fillWeekdayOptions(weekdayOptions);
   fillWeekdayOptions(manualWeekdays);
+  fillSelect(manualDays, weekdays.map((_, index) => [index + 1, index + 1]));
+  manualDays.value = "2";
+  updateManualHint();
+  manualDays.addEventListener("change", updateManualHint);
+  manualWeekdays.addEventListener("change", updateManualHint);
   weekdayOptions.addEventListener("change", updateWeekdayHint);
   days.addEventListener("change", updateWeekdayHint);
 
@@ -583,6 +688,7 @@ const trainingPlanner = (() => {
     level.value = options?.level ?? Object.keys(levels)[0];
     minutes.value = options?.minutes ?? sessionTime.defaultMinutes;
     updateDuration();
+    days.value = "";
     updateDays();
     if (options) days.value = String(options.days);
     applyWeekdays();
@@ -625,6 +731,7 @@ const trainingPlanner = (() => {
     };
     const trainingDays = checkedWeekdays(weekdayOptions);
     if (trainingDays.length !== options.days) {
+      showPlannerStep(1);
       settingsStatus.textContent = `Wähle genau ${options.days} Trainingstage aus.`;
       weekdayOptions.querySelector("input").focus();
       return;
@@ -636,7 +743,15 @@ const trainingPlanner = (() => {
       equipmentOptions.querySelector("input").focus();
       return;
     }
-    generated.plan.sessions.forEach((session, index) => { session.weekday = trainingDays[index]; });
+    const available = new Set(trainingDays);
+    if (plan?.options?.split === options.split) {
+      for (const session of generated.plan.sessions) {
+        const previous = plan.sessions.find(({ name }) => name === session.name);
+        if (previous && available.delete(previous.weekday)) session.weekday = previous.weekday;
+      }
+    }
+    const remaining = available.values();
+    for (const session of generated.plan.sessions) session.weekday ??= remaining.next().value;
     createPlan(generated.plan, generated.notices, settingsStatus);
   });
 
@@ -649,7 +764,13 @@ const trainingPlanner = (() => {
       manualForm.reportValidity();
       return;
     }
-    const sessions = checkedWeekdays(manualWeekdays).map((weekday, index) =>
+    const selected = checkedWeekdays(manualWeekdays);
+    if (selected.length !== Number(manualDays.value)) {
+      status.textContent = `Wähle genau ${manualDays.value} Trainingstage aus.`;
+      manualWeekdays.querySelector("input").focus();
+      return;
+    }
+    const sessions = selected.map((weekday, index) =>
       ({ name: `Einheit ${index + 1}`, weekday, exercises: [] }));
     createPlan({ name, options: null, sessions });
   });
@@ -666,6 +787,8 @@ const trainingPlanner = (() => {
 
   function closeDialogs() {
     finishExerciseDrag();
+    actionDialog.dismissWithin(document.querySelector("#training-planner"));
+    actionDialog.dismissWithin(settingsDialog);
     if (settingsDialog.open) settingsDialog.close();
     if (addDialog.open) addDialog.close();
   }
@@ -680,6 +803,7 @@ const trainingPlanner = (() => {
       closeDialogs();
       workspace = nextWorkspace;
       plan = workspace ? normalizePlan(selectedPlan) : localPlan;
+      draftDays.clear();
       applyOptions(plan?.options);
       status.textContent = "";
       renderNotices();

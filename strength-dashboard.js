@@ -745,14 +745,23 @@ const strengthDashboard = (() => {
     device.addEventListener("change", loadWeightRange); mode.addEventListener("change", loadWeightRange);
     loadWeightRange();
     const reset = node("button", "plan-button", "Übung zurücksetzen"); reset.type = "button"; reset.id = "workout-reset-exercise";
-    reset.addEventListener("click", () => {
+    reset.addEventListener("click", async () => {
       const current = currentExercise();
       if (current?.instanceId !== exercise.instanceId) return;
+      const epoch = accountEpoch, workoutId = journal.active.id;
       const scope = [current.name, current.equipmentKey, trainingGuidance.modes[profile.mode]].filter(Boolean).join(" · ");
-      if (!window.confirm(`„${scope}“ zurücksetzen? Die Satzdaten und Krafttests dieser Variante werden im aktuellen Training und in der Historie gelöscht.`)) return;
       const key = trainingGuidance.scopeKey({ ...catalog.get(current.id), ...current });
+      if (!await actionDialog.confirm(reset, "Übung zurücksetzen",
+        `Die Satzdaten und Krafttests für „${scope}“ werden im aktuellen Training und in der Historie gelöscht.`, "Übung zurücksetzen")) return;
+      if (accountEpoch !== epoch || journal?.active?.id !== workoutId || !sheet.open || currentExercise() !== current) return;
       const next = workoutState.resetExercise(journal, key, catalog);
-      if (writeJournal(next, sheetStatus)) { render(); renderWorkout(); renderExercise(); sheetStatus.textContent = "Übung zurückgesetzt. Du kannst einen neuen Krafttest erfassen."; }
+      if (writeJournal(next, sheetStatus)) {
+        render(); renderWorkout(); renderExercise();
+        sheetStatus.textContent = "Übung zurückgesetzt. Du kannst einen neuen Krafttest erfassen.";
+        sheet.querySelector("#workout-targets-details").open = true;
+        sheet.querySelector(".guidance-profile").open = true;
+        sheet.querySelector("#workout-reset-exercise").focus({ preventScroll: true });
+      }
     });
     const deloadLabel = node("label", "guidance-checkbox"), deload = node("input"); deload.name = "deload"; deload.type = "checkbox"; deload.checked = Boolean(exercise.deload);
     deloadLabel.append(deload, "Heute bewusst leichter trainieren (nicht für den Leistungstrend)");
@@ -1111,10 +1120,18 @@ const strengthDashboard = (() => {
       }
     }
   }
-  document.querySelector("#workout-apply-plan").addEventListener("click", () => settlePlanChange(true));
+  document.querySelector("#workout-apply-plan").addEventListener("click", async ({ currentTarget }) => {
+    const pending = pendingChange(), epoch = accountEpoch;
+    if (!pending || applying || !await actionDialog.confirm(currentTarget, "Änderungen in den Plan übernehmen",
+      "Die Änderungen an dieser Einheit gelten dann auch für zukünftige Trainings mit diesem Plan.", "Änderungen übernehmen")) return;
+    if (accountEpoch === epoch && pendingChange()?.workoutId === pending.workoutId) settlePlanChange(true);
+  });
   document.querySelector("#workout-keep-session").addEventListener("click", () => settlePlanChange(false));
-  document.querySelector("#strength-discard").addEventListener("click", () => {
-    if (!journal?.active || !window.confirm("Dieses Training verwerfen?")) return;
+  document.querySelector("#strength-discard").addEventListener("click", async ({ currentTarget }) => {
+    const id = journal?.active?.id, epoch = accountEpoch;
+    if (!id || !await actionDialog.confirm(currentTarget, "Training verwerfen",
+      "Die Eingaben dieser laufenden Einheit werden gelöscht.", "Training verwerfen")) return;
+    if (accountEpoch !== epoch || journal?.active?.id !== id) return;
     if (!writeJournal({ ...journal, active: null }, workoutStatus)) return;
     if (sheet.open) sheet.close(); dialog.close(); render();
   });
@@ -1185,6 +1202,8 @@ const strengthDashboard = (() => {
   window.setInterval(renderTimers, 1000);
   window.addEventListener("storage", (event) => {
     if (!storageKey || (event.key !== storageKey && event.key !== null)) return;
+    actionDialog.dismissWithin(sheet);
+    actionDialog.dismissWithin(dialog);
     journal = readJournal();
     if (dialog.open) {
       if (journal.active) renderWorkout();
@@ -1207,6 +1226,8 @@ const strengthDashboard = (() => {
     close() {
       checkinContext = null;
       finishDrag();
+      actionDialog.dismissWithin(sheet);
+      actionDialog.dismissWithin(dialog);
       if (dialog.open && journal?.active) saveActive(workoutState.pause(journal.active));
       for (const sheet of [checkinDialog, document.querySelector("#workout-exercise-dialog"), dialog, optionsDialog, historyDialog, activityDialog]) {
         if (sheet.open) sheet.close();
@@ -1215,6 +1236,8 @@ const strengthDashboard = (() => {
     },
     setAccount(id) {
       checkinContext = null;
+      actionDialog.dismissWithin(sheet);
+      actionDialog.dismissWithin(dialog);
       if (checkinDialog.open) checkinDialog.close();
       finishDrag();
       if (storageKey && journal?.active) saveActive(workoutState.pause(journal.active));

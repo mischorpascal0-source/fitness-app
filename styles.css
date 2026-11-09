@@ -409,6 +409,17 @@ dialog {
 dialog { background: var(--surface-gradient); box-shadow: inset 0 1px 0 rgb(255 255 255 / .14), 0 24px 80px rgb(0 0 0 / .55); }
 dialog::backdrop { background: var(--backdrop); backdrop-filter: blur(8px); }
 
+#action-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  width: min(calc(100% - 1.5rem), 29rem);
+  overflow: hidden;
+}
+#action-dialog h2 { font-size: clamp(1.25rem, 5vw, 1.5rem); overflow-wrap: anywhere; }
+#action-dialog .detail-header, #action-dialog .planner-actions { flex: none; }
+#action-dialog-message { min-height: 0; overflow: auto; overflow-wrap: anywhere; }
+#action-dialog .plan-button { flex: 1 1 auto; min-height: 2.75rem; white-space: normal; }
+
 .detail-header {
   position: sticky;
   top: 0;
@@ -629,6 +640,8 @@ a.plan-button { display: inline-flex; align-items: center; text-decoration: none
 .plan-equipment-options { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-2); }
 .plan-equipment-options label { display: flex; align-items: center; min-height: 2.75rem; padding-inline: var(--space-2); gap: var(--space-1); border: 1px solid var(--border); border-radius: var(--radius-control); cursor: pointer; }
 .plan-equipment-options input { accent-color: var(--accent); }
+.weekday-options label:has(input:checked) { border-color: var(--accent); background: var(--raised); }
+.weekday-options label:has(input:disabled) { color: var(--muted); opacity: .65; cursor: default; }
 
 .training-days, .workout-sets {
   min-width: 0;
