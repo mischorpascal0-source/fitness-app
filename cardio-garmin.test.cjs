@@ -105,6 +105,7 @@ function browserHarness(fetcher) {
     localStorage: { getItem: (key) => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value), removeItem: (key) => storage.delete(key) },
     Intl, Date, AbortController, AbortSignal, fetch: fetcher,
   });
+  vm.runInContext(fs.readFileSync(require.resolve("./cardio-recovery.js"), "utf8"), context);
   vm.runInContext(fs.readFileSync(require.resolve("./cardio-garmin.js"), "utf8") + "\nglobalThis.app = cardioGarmin;", context);
   nodes["#garmin-period"].value = "all";
   return { app: context.app, nodes, storage, submit: (key) => {
@@ -289,4 +290,28 @@ test("maximum supported key length fits the encrypted record and tampering canno
   assert.equal(keys.open("account-b", encrypted), null);
   const tampered = encrypted.slice(0, -12) + "AAAAAAAAAAAA";
   assert.equal(keys.open("account-a", tampered), null);
+});
+
+test("wellness summary provides only bounded recovery metrics and Garmin measurement time", async () => {
+  const res = response();
+  await handleGarmin(request({ apiKey: "personal-key", calendarDate: "2026-11-09" }), res, "http://localhost:3000", account, async (url, options) => {
+    if (options.method === "POST") return { ok: true, text: async () => "token.test" };
+    return { ok: true, json: async () => url.includes("usersummary") ? {
+      calendarDate: "2026-11-09", includesWellnessData: true, bodyBatteryMostRecentValue: 22,
+      averageStressLevel: -1, wellnessEndTimeGmt: "2026-11-09T10:00:00", displayName: "private",
+    } : [run] };
+  });
+  assert.deepEqual(res.body.health, { calendarDate: "2026-11-09", bodyBattery: 22, stress: null, measuredAt: "2026-11-09T10:00:00Z" });
+  assert.doesNotMatch(JSON.stringify(res.body), /private/);
+});
+
+test("optional wellness failure preserves synchronized runs", async () => {
+  const res = response();
+  await handleGarmin(request(), res, "http://localhost:3000", account, async (url, options) => {
+    if (url.includes("usersummary")) return { ok: false, status: 404 };
+    return garminSuccess(url, options);
+  });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.runs.length, 1);
+  assert.equal(res.body.health, null);
 });

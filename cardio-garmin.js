@@ -63,6 +63,15 @@ const cardioGarmin = (() => {
     find("disconnect").disabled = busy;
     find("state").textContent = connected ? "Verbunden · Im Konto gespeichert" : saved.syncedAt ? "Gespeicherte Laufdaten" : "Nicht verbunden";
     find("state").dataset.connected = String(connected);
+    const health = saved.health;
+    find("battery").textContent = valid(health?.bodyBattery) && health.bodyBattery <= 100 ? number.format(health.bodyBattery) + " / 100" : "–";
+    find("stress").textContent = valid(health?.stress) && health.stress <= 100 ? number.format(health.stress) + " / 100" : "–";
+    find("health-time").textContent = Number.isFinite(Date.parse(health?.measuredAt)) ? "Uhrdaten vom " + dateFormat.format(new Date(health.measuredAt)) + " · Anpassung nur mit höchstens 6 Stunden alten Daten" : "Keine aktuellen Garmin-Erholungsdaten verfügbar.";
+    const minutes = Number(find("base-minutes").value);
+    const advice = cardioRecommendation(health, [20, 30, 45, 60].includes(minutes) ? minutes : 30);
+    const recommendation = find("recommendation");
+    recommendation.dataset.level = advice.level;
+    recommendation.replaceChildren(element("h4", advice.title), element("p", `${advice.minutes} Minuten · ${advice.intensity}`), element("p", advice.reason, "planner-note"));
     const period = find("period").value;
     const cutoff = new Date();
     cutoff.setHours(0, 0, 0, 0);
@@ -96,7 +105,7 @@ const cardioGarmin = (() => {
     try {
       const response = await fetch("/api/garmin", {
         method: "POST", headers: { "Content-Type": "application/json", "X-Fitness-Account": currentAccount },
-        body: JSON.stringify({ apiKey: key }), signal,
+        body: JSON.stringify({ apiKey: key, calendarDate: new Date().getFullYear() + "-" + String(new Date().getMonth() + 1).padStart(2, "0") + "-" + String(new Date().getDate()).padStart(2, "0") }), signal,
       });
       const result = await response.json().catch(() => null);
       if (currentRevision !== revision) return;
@@ -106,7 +115,7 @@ const cardioGarmin = (() => {
         throw new Error(result?.error ?? "Garmin konnte nicht verbunden werden.");
       }
       if (!Array.isArray(result?.runs) || !Number.isFinite(Date.parse(result.syncedAt))) throw new Error("Ungültige Antwort beim Laden der Laufdaten.");
-      saved = { runs: result.runs, syncedAt: result.syncedAt };
+      saved = { runs: result.runs, syncedAt: result.syncedAt, health: result.health ?? null };
       connected = true;
       keyInput.value = "";
       find("setup").open = false;
@@ -130,6 +139,12 @@ const cardioGarmin = (() => {
   });
   find("sync").addEventListener("click", () => sync());
   find("period").addEventListener("change", render);
+  find("base-minutes").addEventListener("change", render);
+  // Re-evaluate freshness after a background tab resumes or the clock advances.
+  if (typeof window !== "undefined") {
+    window.addEventListener("focus", render);
+    setInterval(() => { if (accountId) render(); }, 60000);
+  }
   find("disconnect").addEventListener("click", async () => {
     if (controller || !accountId) return;
     const account = accountId;
@@ -168,7 +183,7 @@ const cardioGarmin = (() => {
         try {
           const cached = JSON.parse(localStorage.getItem(cacheKey()));
           if (Array.isArray(cached?.runs) && Number.isFinite(Date.parse(cached.syncedAt))) {
-            saved = { syncedAt: cached.syncedAt, runs: cached.runs.filter((run) =>
+            saved = { health: cached.health ?? null, syncedAt: cached.syncedAt, runs: cached.runs.filter((run) =>
               /^\d+$/.test(run?.id) && typeof run.name === "string" && typeof run.start === "string" && Number.isFinite(Date.parse(run.start)) &&
               [run.distance, run.duration, run.averageHR, run.maxHR, run.elevationGain, run.calories].every((value) => value === null || valid(value))) };
           }

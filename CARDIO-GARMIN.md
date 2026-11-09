@@ -30,3 +30,11 @@ Offizielle Referenzen:
 - https://github.com/garmin/connect-personal-api-python/blob/main/src/garmin_personal_api/auth.py
 
 Prüfung: `node --test cardio-garmin.test.cjs cardio-garmin-store.test.cjs` und `node build-vercel.cjs`. Die Tests prüfen Kontotrennung, Wiederherstellung auf einem zweiten Gerät, Übernahme alter Cookies, gleichzeitiges Trennen/Synchronisieren und Sitzungserneuerung. Echte Garmin-Kontoabfragen benötigen einen persönlichen Schlüssel und werden ohne diesen nicht als erfolgreich ausgegeben.
+
+## Erholung und automatische Cardio-Empfehlung
+
+Die Personal-API-Spezifikation bietet keinen direkten Garmin Trainingszustand oder Training Readiness. Die App zeigt deshalb eine ausdrücklich als App-Einschätzung gekennzeichnete Empfehlung aus `/usersummary-service/usersummary/daily`: aktuelle Body Battery und durchschnittlicher Tagesstress. Es werden nur vorhandene Werte von 0–100 übernommen. Optionale Wellness-Fehler verhindern den Laufimport nicht.
+
+Im Cardio-Reiter kann die geplante lockere Dauer (20/30/45/60 Minuten, Standard 30) gewählt werden. Body Battery ≤25 oder Tagesstress ≥75 halbiert die Dauer und empfiehlt sehr lockeres Gehen oder Pause; Body Battery ≤50 oder Stress ≥50 reduziert auf ungefähr 75 %, ohne Intervalle. Sonst bleibt die lockere Einheit unverändert. Diese einfachen App-Regeln sind keine Garmin-Empfehlung. Es existiert noch kein strukturierter Cardio-Wochenplan; die Anpassung betrifft die sichtbare Tagesempfehlung und überschreibt keine Trainingshistorie.
+
+Die Messzeit stammt aus Garmins `wellnessEndTimeGmt`, nicht aus dem Zeitpunkt des Abrufs. Ohne Messzeit oder verwertbare Werte sowie bei über sechs Stunden alten Uhrdaten wird nicht automatisch angepasst. Angezeigt bleiben die Messwerte samt Zeit. Die Daten werden mit den Läufen kontogetrennt auf diesem Gerät gespeichert und beim Trennen gelöscht. Aktualisierung erfolgt über „Jetzt synchronisieren“; auch ein reaktivierter Tab prüft das Alter erneut.

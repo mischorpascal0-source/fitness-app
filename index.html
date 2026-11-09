@@ -7,6 +7,7 @@
   <title>Anmelden · Fitness-App</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="cardio-garmin.css">
+  <script src="cardio-recovery.js" defer></script>
   <script src="cardio-garmin.js" defer></script>
   <script src="exercises.js" defer></script>
   <script src="exercise-scenes.js" defer></script>
@@ -258,6 +259,16 @@
           <button id="garmin-disconnect" class="plan-button" type="button" hidden>Garmin vom Konto trennen</button>
         </div>
         <p id="garmin-status" class="planner-note" role="status" aria-live="polite"></p>
+        <section class="garmin-recovery" aria-labelledby="garmin-recovery-heading">
+          <span class="eyebrow">Erholung &amp; Cardio</span>
+          <h3 id="garmin-recovery-heading">Dein Trainingszustand</h3>
+          <p class="planner-note">App-Einschätzung aus Garmin Body Battery und Tagesstress. Garmins direkter Trainingszustand und Training Readiness sind über die Personal API nicht verfügbar.</p>
+          <dl class="garmin-totals"><div><dt>Body Battery</dt><dd id="garmin-battery">–</dd></div><div><dt>Ø Tagesstress</dt><dd id="garmin-stress">–</dd></div></dl>
+          <p id="garmin-health-time" class="planner-note"></p>
+          <label>Geplante lockere Einheit<select id="garmin-base-minutes"><option value="20">20 Minuten</option><option value="30" selected>30 Minuten</option><option value="45">45 Minuten</option><option value="60">60 Minuten</option></select></label>
+          <div id="garmin-recommendation" role="status" aria-live="polite"></div>
+          <p class="planner-note">Anpassung erfolgt nach Garmin-Synchronisierung automatisch bei Bedarf. Die Empfehlung verändert keine bereits protokollierten Aktivitäten. Maßgeblich bleibt dein eigenes Befinden.</p>
+        </section>
         <div class="garmin-history-heading"><h3>Garmin-Läufe</h3><label>Zeitraum<select id="garmin-period"><option value="30">Letzte 30 Tage</option><option value="90">Letzte 90 Tage</option><option value="all">Alle geladenen Läufe</option></select></label></div>
         <dl class="garmin-totals"><div><dt>Läufe</dt><dd id="garmin-total-runs">0</dd></div><div><dt>Distanz</dt><dd id="garmin-total-distance">–</dd></div><div><dt>Laufzeit</dt><dd id="garmin-total-duration">–</dd></div><div><dt>Ø Pace</dt><dd id="garmin-total-pace">–</dd></div></dl>
         <p id="garmin-updated" class="planner-note"></p>
