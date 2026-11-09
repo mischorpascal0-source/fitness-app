@@ -1097,7 +1097,7 @@ a.plan-button { display: inline-flex; align-items: center; text-decoration: none
 .calendar-footer .text-link { display: inline-flex; align-items: center; min-height: 2.75rem; margin: 0; text-underline-offset: .25rem; }
 .calendar-actions { gap: 0; }
 .calendar-actions .icon-button { min-height: 2.75rem; width: 2.75rem; background: transparent; box-shadow: none; border: 0; font-size: 1.2rem; }
-#calendar-month { font-size: .625rem; color: var(--muted); }
+.calendar-month { font-size: .625rem; color: var(--muted); }
 .week-calendar { gap: .25rem; }
 .calendar-day { gap: .4rem; min-height: 4.25rem; padding: var(--space-2) 0; border: 1px solid transparent; border-radius: .75rem; }
 .calendar-day small { font-size: .625rem; font-weight: 600; }

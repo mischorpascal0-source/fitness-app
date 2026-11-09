@@ -38,13 +38,12 @@ const strengthDashboard = (() => {
   let shownPlan;
   let shownDate;
   let selectedDate = new Date();
+  const { dateKey } = weekCalendar;
   let lastToday = dateKey(selectedDate);
-
-  function dateKey(date) {
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${date.getFullYear()}-${month}-${day}`;
-  }
+  const calendarView = weekCalendar.create(calendar.closest(".calendar-panel"), (date) => {
+    selectedDate = date;
+    render();
+  });
 
   function selectedSession() {
     const session = trainingPlanner.getPlan()?.sessions[sessionSelect.value];
@@ -141,33 +140,9 @@ const strengthDashboard = (() => {
   }
 
   function renderCalendar(plan) {
-    const day = (selectedDate.getDay() + 6) % 7;
-    const now = dateKey(new Date());
     const completed = new Set(journal.workouts.map(({ date }) => date));
-    document.querySelector("#calendar-month").textContent = new Intl.DateTimeFormat("de-DE", { month: "short", year: "numeric" }).format(selectedDate);
-    document.querySelector("#calendar-selected-date").textContent = new Intl.DateTimeFormat("de-DE", { day: "numeric", month: "short", year: "numeric" }).format(selectedDate);
-    calendar.replaceChildren(...trainingPlanData.weekdays.map((label, index) => {
-      const date = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate() - day + index);
-      const key = dateKey(date);
-      const planned = plan?.sessions.some((session) => session.weekday === index);
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "calendar-day";
-      button.classList.toggle("is-today", key === now);
-      button.classList.toggle("is-planned", Boolean(planned));
-      button.classList.toggle("is-completed", completed.has(key));
-      button.setAttribute("aria-pressed", String(key === dateKey(selectedDate)));
-      button.setAttribute("aria-label", fullDate.format(date) + (planned ? ", Training geplant" : "") + (completed.has(key) ? ", Training abgeschlossen" : ""));
-      const name = document.createElement("small");
-      name.textContent = label.slice(0, 2);
-      const number = document.createElement("strong");
-      number.textContent = completed.has(key) && key !== dateKey(selectedDate) ? "✓" : date.getDate();
-      const dot = document.createElement("span");
-      dot.className = "calendar-dot";
-      button.append(name, number, dot);
-      button.addEventListener("click", () => { selectedDate = date; render(); });
-      return button;
-    }));
+    const planned = new Set(plan?.sessions.map(({ weekday }) => weekday));
+    calendarView.render(selectedDate, completed, planned);
   }
 
   function resetAdjustments() {
@@ -1162,13 +1137,6 @@ const strengthDashboard = (() => {
       calendar.querySelector('[aria-pressed="true"]').focus();
     }
   });
-  document.querySelector("#calendar-today").addEventListener("click", () => { selectedDate = new Date(); render(); });
-  for (const [selector, offset] of [["#calendar-prev", -7], ["#calendar-next", 7]]) {
-    document.querySelector(selector).addEventListener("click", () => {
-      selectedDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate() + offset);
-      render();
-    });
-  }
   for (const type of trainingPlanData.equipment) {
     const label = document.createElement("label");
     const input = document.createElement("input");

@@ -91,7 +91,7 @@ const cardioGarmin = (() => {
     find("runs").replaceChildren(...runs.map(runCard));
     find("empty").hidden = runs.length > 0;
     find("empty").textContent = saved.syncedAt ? "Keine Garmin-Läufe in diesem Zeitraum. Wähle einen anderen Zeitraum oder synchronisiere erneut."
-      : connected ? "Deine Garmin-Verbindung ist im Konto verfügbar. Tippe auf „Jetzt synchronisieren“, um deine Läufe auf dieses Gerät zu laden."
+      : connected ? (busy ? "Garmin-Läufe werden geladen …" : "Tippe auf „Jetzt synchronisieren“, um deine Garmin-Läufe zu laden.")
         : "Verbinde Garmin, um deine Laufdaten zu laden.";
     find("updated").textContent = saved.syncedAt ? "Zuletzt geladen: " + dateFormat.format(new Date(saved.syncedAt)) + " · Bis zu 100 letzte Läufe · Auf diesem Gerät gespeichert" : "";
     root.setAttribute("aria-busy", String(busy));
@@ -150,6 +150,9 @@ const cardioGarmin = (() => {
   // Re-evaluate freshness after a background tab resumes or the clock advances.
   if (typeof window !== "undefined") {
     window.addEventListener("focus", render);
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden && connected) sync();
+    });
     setInterval(() => { if (accountId) render(); }, 60000);
   }
   find("disconnect").addEventListener("click", async () => {
@@ -211,7 +214,12 @@ const cardioGarmin = (() => {
           .then((response) => { if (!response.ok) throw new Error("Die gespeicherte Garmin-Verbindung konnte nicht geprüft werden."); return response.json(); })
           .then((result) => { if (version === revision) { connected = result.connected === true; find("setup").open = !connected; status.textContent = ""; } })
           .catch((error) => { if (version === revision) { syncError = true; status.textContent = error.message; } })
-          .finally(() => { if (version === revision) { controller = null; render(); } });
+          .finally(() => {
+            if (version !== revision) return;
+            controller = null;
+            if (connected && !document.hidden) sync();
+            else render();
+          });
       }
     },
   };

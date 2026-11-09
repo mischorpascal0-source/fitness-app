@@ -20,6 +20,7 @@
   <script src="exercise-library.js" defer></script>
   <script src="training-guidance.js" defer></script>
   <script src="workout-state.js" defer></script>
+  <script src="week-calendar.js" defer></script>
   <script src="strength-dashboard.js" defer></script>
   <script src="daily-tracking.js" defer></script>
   <script src="cardio-suggestions.js" defer></script>
@@ -144,9 +145,9 @@
     </div>
     <section id="strength-dashboard" hidden>
       <section class="card library-panel calendar-panel" aria-label="Trainingskalender">
-        <div class="section-heading"><span id="calendar-selected-date"></span><div class="calendar-actions"><button id="calendar-prev" class="icon-button" type="button" aria-label="Vorherige Woche">‹</button><span id="calendar-month"></span><button id="calendar-next" class="icon-button" type="button" aria-label="Nächste Woche">›</button></div></div>
+        <div class="section-heading"><span id="calendar-selected-date" data-calendar-selected></span><div class="calendar-actions"><button id="calendar-prev" class="icon-button" type="button" aria-label="Vorherige Woche" data-calendar-prev>‹</button><span id="calendar-month" class="calendar-month"></span><button id="calendar-next" class="icon-button" type="button" aria-label="Nächste Woche" data-calendar-next>›</button></div></div>
         <div id="strength-calendar" class="week-calendar"></div>
-        <div class="calendar-footer"><a class="text-link" href="#trainingsplan">Wöchentliche Trainingstage ändern</a><button id="calendar-today" class="text-button" type="button">Heute</button></div>
+        <div class="calendar-footer"><a class="text-link" href="#trainingsplan">Wöchentliche Trainingstage ändern</a><button id="calendar-today" class="text-button" type="button" data-calendar-today>Heute</button></div>
       </section>
       <p id="strength-schedule" class="training-day-note"></p>
       <section class="card library-panel session-card" id="strength-session-card" aria-labelledby="strength-today">
@@ -242,7 +243,8 @@
       <div class="activity-options"><button class="card action-row" id="activity-strength" type="button"><svg aria-hidden="true"><use href="#icon-strength"/></svg>Krafttraining</button><a class="card action-row" href="#cardio"><svg aria-hidden="true"><use href="#icon-cardio"/></svg>Cardio</a><a class="card action-row" href="#mobility"><svg aria-hidden="true"><use href="#icon-mobility"/></svg>Mobility</a></div>
     </dialog>
     <section id="nutrition-view" hidden>
-      <div class="section-heading"><h2>Dein Ernährungstagebuch</h2><label class="date-control"><span class="sr-only">Datum für Ernährung</span><input id="nutrition-date" type="date"></label></div>
+      <section id="nutrition-calendar" class="card library-panel calendar-panel" aria-label="Ernährungskalender"></section>
+      <h2>Dein Ernährungstagebuch</h2>
       <section class="card library-panel">
         <div class="calorie-overview"><div class="calorie-ring" id="nutrition-ring"><span><strong id="nutrition-remaining">0</strong><small>kcal übrig</small></span></div><div class="calorie-detail"><span>Gegessen</span><strong id="nutrition-eaten">0 kcal</strong><span>Tagesziel</span><strong id="nutrition-goal">2.200 kcal</strong></div></div>
         <div class="macro-grid" id="nutrition-macros"></div>
@@ -252,6 +254,13 @@
       <p id="nutrition-status" class="planner-note" role="status"></p>
     </section>
     <section id="cardio-view" hidden>
+      <section id="cardio-calendar" class="card library-panel calendar-panel" aria-label="Cardiokalender"></section>
+      <section class="card library-panel" aria-labelledby="cardio-day-title">
+        <div class="section-heading"><h2 id="cardio-day-title">Aktivitäten am gewählten Tag</h2><button id="cardio-open" class="plan-button primary" type="button" aria-haspopup="dialog">Aktivität eintragen</button></div>
+        <ul id="cardio-history" class="entry-list"></ul>
+        <p id="cardio-empty" class="planner-note"></p>
+        <p id="cardio-status" class="planner-note" role="status"></p>
+      </section>
       <section class="card library-panel cardio-start-card" aria-labelledby="cardio-start-title">
         <span class="eyebrow">Dein Training heute</span>
         <h2 id="cardio-start-title">Was passt heute zu dir?</h2>
@@ -309,14 +318,7 @@
         <p id="garmin-empty" class="planner-note">Verbinde Garmin, um deine Laufdaten zu laden.</p>
         <p class="planner-note">Datenquelle: Garmin. Garmin-Läufe werden separat von deinen manuellen Aktivitäten angezeigt.</p>
       </section>
-      <section class="card library-panel">
-        <div class="section-heading"><span class="eyebrow">In Bewegung bleiben</span><svg aria-hidden="true"><use href="#icon-cardio"/></svg></div>
-        <h2>Jede Einheit zählt.</h2><p class="planner-note">Halte deine Ausdaueraktivitäten fest und sieh deine Woche wachsen.</p>
-        <div class="planner-actions"><button id="cardio-open" class="plan-button primary" type="button" aria-haspopup="dialog">Aktivität eintragen</button></div>
-      </section>
-      <section class="card library-panel"><h2>Deine Woche</h2><dl class="strength-totals"><div><dt>Aktive Minuten</dt><dd id="cardio-minutes">0</dd></div><div><dt>Kilometer</dt><dd id="cardio-distance">0</dd></div></dl><div id="cardio-chart" class="activity-chart" aria-label="Aktivitätsminuten pro Wochentag"></div></section>
-      <section class="card library-panel"><h2>Letzte Aktivitäten</h2><ul id="cardio-history" class="entry-list"></ul><p id="cardio-empty" class="planner-note">Trage deine erste Aktivität ein.</p></section>
-      <p id="cardio-status" class="planner-note" role="status"></p>
+      <section class="card library-panel"><h2>Deine Woche</h2><p id="cardio-week-date" class="planner-note"></p><dl class="strength-totals"><div><dt>Aktive Minuten</dt><dd id="cardio-minutes">0</dd></div><div><dt>Kilometer</dt><dd id="cardio-distance">0</dd></div></dl><div id="cardio-chart" class="activity-chart" aria-label="Aktivitätsminuten pro Wochentag"></div></section>
     </section>
     <section id="mobility-view" hidden>
       <section class="card library-panel"><span class="eyebrow">Deine tägliche Routine</span><h2>Mehr Bewegung.<br>Ein paar Minuten für dich.</h2><p class="planner-note">Eine kurze Routine für Schultern, Rücken, Hüfte und Waden.</p><div class="planner-actions"><button id="mobility-start" class="plan-button primary" type="button">Routine starten</button></div><p id="mobility-status" class="planner-note" role="status"></p></section>
@@ -451,6 +453,11 @@
       </div>
     </section>
   </main>
+  <template id="diary-calendar-template">
+    <div class="section-heading"><span data-calendar-selected></span><div class="calendar-actions"><button class="icon-button" type="button" aria-label="Vorherige Woche" data-calendar-prev>‹</button><span class="calendar-month"></span><button class="icon-button" type="button" aria-label="Nächste Woche" data-calendar-next>›</button></div></div>
+    <div class="week-calendar"></div>
+    <div class="calendar-footer"><label class="date-control"><span class="sr-only">Datum wählen</span><input type="date"></label><button class="text-button" type="button" data-calendar-today>Heute</button></div>
+  </template>
   <nav class="bottom-nav" aria-label="Hauptnavigation" hidden>
     <div class="nav-inner">
       <a href="#home" data-title="Dashboard" aria-current="page"><svg aria-hidden="true"><use href="#icon-home"/></svg>Home</a>
@@ -588,6 +595,7 @@
     <div class="detail-header"><h2 id="food-title">Essen eintragen</h2><form method="dialog"><button class="plan-button">Schließen</button></form></div>
     <form id="food-form" class="library-controls">
       <label class="full-row">Lebensmittel oder Mahlzeit <input name="foodName" maxlength="100" placeholder="z. B. Haferflocken mit Joghurt" required></label>
+      <label>Datum <input name="date" type="date" required></label>
       <label>Mahlzeit <select name="meal"><option>Frühstück</option><option>Mittagessen</option><option>Abendessen</option><option>Snacks</option></select></label>
       <label>Kalorien in kcal <input name="calories" type="number" min="0" max="20000" step="1" required></label>
       <label>Protein in g <input name="protein" type="number" min="0" max="2000" step=".1" value="0" required></label>

@@ -1,7 +1,12 @@
 const dailyTracking = (() => {
   const format = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 });
+  const weekFormat = new Intl.DateTimeFormat("de-DE", { day: "numeric", month: "short", year: "numeric" });
   const mealNames = ["Frühstück", "Mittagessen", "Abendessen", "Snacks"];
-  const nutritionDate = document.querySelector("#nutrition-date");
+  const { dateKey: keyForDate, daysFor } = weekCalendar;
+  let nutritionDate = new Date();
+  let cardioDate = new Date();
+  const nutritionCalendar = diaryCalendar("nutrition", (date) => { nutritionDate = date; renderNutrition(); }, "Mahlzeit erfasst");
+  const cardioCalendar = diaryCalendar("cardio", (date) => { cardioDate = date; renderCardio(); }, "Aktivität erfasst");
   const dailyForm = document.querySelector("#daily-form");
   const stepField = dailyForm.elements.steps;
   const stepsSource = document.querySelector("#steps-source");
@@ -28,8 +33,11 @@ const dailyTracking = (() => {
     return keyForDate(new Date());
   }
 
-  function keyForDate(date) {
-    return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"), String(date.getDate()).padStart(2, "0")].join("-");
+  function diaryCalendar(name, onSelect, completedLabel) {
+    const panel = document.getElementById(name + "-calendar");
+    panel.append(document.querySelector("#diary-calendar-template").content.cloneNode(true));
+    panel.querySelector("input").id = name + "-date";
+    return weekCalendar.create(panel, onSelect, completedLabel);
   }
 
   function emptyData() {
@@ -204,7 +212,9 @@ const dailyTracking = (() => {
   }
 
   function renderNutrition() {
-    const entries = data.foods.filter((entry) => entry.date === nutritionDate.value);
+    nutritionCalendar.render(nutritionDate, new Set(data.foods.map(({ date }) => date)));
+    const selected = keyForDate(nutritionDate);
+    const entries = data.foods.filter(({ date }) => date === selected);
     const sum = totals(entries);
     const remaining = data.goals.calories - sum.calories;
     document.querySelector("#nutrition-eaten").textContent = format.format(sum.calories) + " kcal";
@@ -244,17 +254,24 @@ const dailyTracking = (() => {
   }
 
   function renderCardio() {
-    const now = new Date();
-    const weekday = (now.getDay() + 6) % 7;
-    const week = Array.from({ length: 7 }, (_, index) => keyForDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() - weekday + index)));
+    cardioCalendar.render(cardioDate, new Set(data.cardio.map(({ date }) => date)));
+    const days = daysFor(cardioDate);
+    const week = days.map(keyForDate);
     const entries = data.cardio.filter(({ date }) => week.includes(date));
+    document.querySelector("#cardio-week-date").textContent = weekFormat.formatRange(days[0], days.at(-1));
     document.querySelector("#cardio-minutes").textContent = format.format(entries.reduce((sum, entry) => sum + entry.minutes, 0));
     document.querySelector("#cardio-distance").textContent = format.format(entries.reduce((sum, entry) => sum + entry.distance, 0));
     const minutes = week.map((date) => entries.filter((entry) => entry.date === date).reduce((sum, entry) => sum + entry.minutes, 0));
     renderBars("#cardio-chart", week, minutes);
-    document.querySelector("#cardio-empty").hidden = data.cardio.length > 0;
-    document.querySelector("#cardio-history").replaceChildren(...[...data.cardio].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 20)
-      .map((entry) => entryRow(entry.name, entry.date.split("-").reverse().join(".") + " · " + entry.minutes + " Min. · " + format.format(entry.distance) + " km", () => {
+    const selected = keyForDate(cardioDate);
+    const dayEntries = entries.filter(({ date }) => date === selected);
+    const isFuture = selected > today();
+    const empty = document.querySelector("#cardio-empty");
+    empty.hidden = dayEntries.length > 0;
+    empty.textContent = isFuture ? "Du kannst Aktivitäten für heute oder vergangene Tage eintragen." : "Für diesen Tag ist noch keine Aktivität eingetragen.";
+    document.querySelector("#cardio-open").disabled = isFuture;
+    document.querySelector("#cardio-history").replaceChildren(...dayEntries.reverse()
+      .map((entry) => entryRow(entry.name, format.format(entry.minutes) + " Min. · " + format.format(entry.distance) + " km", () => {
         commit((next) => { next.cardio = next.cardio.filter(({ id }) => id !== entry.id); }, cardioStatus);
       })));
   }
@@ -298,9 +315,11 @@ const dailyTracking = (() => {
   }
 
   function render() {
-    if (nutritionDate.value === lastToday && lastToday !== today()) nutritionDate.value = today();
+    if (lastToday !== today()) {
+      if (keyForDate(nutritionDate) === lastToday) nutritionDate = new Date();
+      if (keyForDate(cardioDate) === lastToday) cardioDate = new Date();
+    }
     lastToday = today();
-    if (!nutritionDate.value) nutritionDate.value = today();
     renderSteps();
     renderMetric("calories", totals(data.foods.filter(({ date }) => date === today())).calories, data.goals.calories, " kcal");
     const homeRing = document.querySelector("#home-calorie-ring");
@@ -358,8 +377,9 @@ const dailyTracking = (() => {
     }, dailyForm.querySelector(".form-status"))) document.querySelector("#daily-dialog").close();
   });
 
-  openForm("#food-open", "#food-dialog", foodForm);
-  nutritionDate.addEventListener("change", () => { if (nutritionDate.value) renderNutrition(); });
+  openForm("#food-open", "#food-dialog", foodForm, () => {
+    foodForm.elements.date.value = keyForDate(nutritionDate);
+  });
   foodForm.addEventListener("submit", (event) => {
     event.preventDefault();
     if (!foodForm.reportValidity()) return;
@@ -369,13 +389,19 @@ const dailyTracking = (() => {
       foodForm.reportValidity();
       return;
     }
-    const entry = { id: crypto.randomUUID(), date: nutritionDate.value, name, meal: foodForm.elements.meal.value };
+    const entry = { id: crypto.randomUUID(), date: foodForm.elements.date.value, name, meal: foodForm.elements.meal.value };
     for (const field of ["calories", "protein", "carbs", "fat"]) entry[field] = foodForm.elements[field].valueAsNumber;
-    if (commit((next) => next.foods.push(entry), foodForm.querySelector(".form-status"))) document.querySelector("#food-dialog").close();
+    if (commit((next) => next.foods.push(entry), foodForm.querySelector(".form-status"))) {
+      if (entry.date !== keyForDate(nutritionDate)) {
+        nutritionDate = new Date(entry.date + "T12:00:00");
+        renderNutrition();
+      }
+      document.querySelector("#food-dialog").close();
+    }
   });
 
   openForm("#cardio-open", "#cardio-dialog", cardioForm, () => {
-    cardioForm.elements.date.value = today();
+    cardioForm.elements.date.value = keyForDate(cardioDate);
     cardioForm.elements.date.max = today();
   });
   cardioForm.addEventListener("submit", (event) => {
@@ -385,8 +411,20 @@ const dailyTracking = (() => {
       id: crypto.randomUUID(), name: cardioForm.elements.activity.value, date: cardioForm.elements.date.value,
       minutes: cardioForm.elements.minutes.valueAsNumber, distance: cardioForm.elements.distance.valueAsNumber,
     };
-    if (commit((next) => next.cardio.push(entry), cardioForm.querySelector(".form-status"))) document.querySelector("#cardio-dialog").close();
+    if (saveCardio(entry, cardioForm.querySelector(".form-status"))) document.querySelector("#cardio-dialog").close();
   });
+
+  function saveCardio(entry, status) {
+    if (!storageKey) { status.textContent = "Zum Speichern bitte anmelden."; return false; }
+    const saved = commit((next) => {
+      if (!next.cardio.some(({ id }) => id === entry.id)) next.cardio.push(entry);
+    }, status);
+    if (saved && entry.date !== keyForDate(cardioDate)) {
+      cardioDate = new Date(entry.date + "T12:00:00");
+      renderCardio();
+    }
+    return saved;
+  }
   document.querySelector("#mobility-start").addEventListener("click", () => {
     const done = data.mobility[today()] ?? [];
     const index = routines.findIndex((_, index) => !done.includes(index));
@@ -405,12 +443,7 @@ const dailyTracking = (() => {
 
   return {
     render,
-    recordCardio(entry, status) {
-      if (!storageKey) { status.textContent = "Zum Speichern bitte anmelden."; return false; }
-      return commit(next => {
-        if (!next.cardio.some(item => item.id === entry.id)) next.cardio.push(entry);
-      }, status);
-    },
+    recordCardio: saveCardio,
     getWeightDates: () => Object.keys(data.weights),
     getSocialEntries: () => ({
       nutrition: data.foods.map(({ date, meal }) => ({ id: `${date}:${mealNames.indexOf(meal)}`, date, value: 1 })),
@@ -420,7 +453,8 @@ const dailyTracking = (() => {
       storageKey = id ? "fitness-app.daily.v1." + id : null;
       data = read();
       mobilityTimer = null;
-      nutritionDate.value = today();
+      nutritionDate = new Date();
+      cardioDate = new Date();
       nutritionStatus.textContent = "";
       cardioStatus.textContent = "";
       render();
