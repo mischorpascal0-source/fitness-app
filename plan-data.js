@@ -4,6 +4,12 @@ const trainingPlanData = (() => {
   const equipment = [...new Set(catalog.map(({ type }) => type))];
   const splits = {
     upperLower: { label: "Oberkörper / Unterkörper", days: [2, 4], sessions: ["Oberkörper", "Unterkörper"] },
+    torsoLimbs: {
+      label: "Torso / Limbs",
+      days: [2, 4],
+      sessions: ["Torso", "Limbs"],
+      variants: { 4: ["Torso A", "Limbs A", "Torso B", "Limbs B"] },
+    },
     pushPullLegs: { label: "Push / Pull / Legs", days: [3, 6], sessions: ["Push", "Pull", "Beine"] },
     fullBody: { label: "Ganzkörper", days: [2, 3], sessions: ["Ganzkörper"] },
   };

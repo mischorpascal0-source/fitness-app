@@ -342,6 +342,7 @@ const strengthDashboard = (() => {
   let accountEpoch = 0, finishing = false, applying = false;
   let planAccess, sheetId, sheetView = "preview", candidate, drag;
   let replaceFilters = { query: "", group: "", type: "" };
+  let swapFromList = false;
 
   const node = (tag, className, text) => {
     const element = document.createElement(tag);
@@ -524,7 +525,13 @@ const strengthDashboard = (() => {
       const handle = node("button", "workout-grip", "⠿"); handle.type = "button";
       handle.setAttribute("aria-label", `${exercise.name} verschieben, Position ${index + 1} von ${journal.active.exercises.length}`);
       handle.setAttribute("aria-describedby", "workout-order-help");
-      row.append(open, handle);
+      const swap = node("button", "workout-list-swap");
+      swap.type = "button";
+      swap.setAttribute("aria-label", `${exercise.name} austauschen`);
+      swap.setAttribute("aria-haspopup", "dialog");
+      swap.innerHTML = '<svg aria-hidden="true"><use href="#icon-swap"/></svg>';
+      swap.addEventListener("click", () => openExercise(exercise.instanceId, true));
+      row.append(open, handle, swap);
       return row;
     }));
     const archived = journal.active.replacedExercises;
@@ -596,16 +603,30 @@ const strengthDashboard = (() => {
   function closeExercise() {
     if (sheet.open) sheet.close();
     if (journal?.active) { renderList(); updateWorkoutProgress(); }
-    const button = [...workoutExercises.children].find((row) => row.dataset.instanceId === sheetId)?.querySelector(".workout-exercise-open");
+    const row = [...workoutExercises.children].find((item) => item.dataset.instanceId === sheetId);
+    const button = row?.querySelector(swapFromList ? ".workout-list-swap" : ".workout-exercise-open");
     button?.focus({ preventScroll: true });
   }
-  function openExercise(id) {
+  function openExercise(id, replace = false) {
     if (!journal?.active?.exercises.some(({ instanceId }) => instanceId === id)) return;
     const next = refreshGuidance(journal.active.stage === "summary" ? workoutState.resume(journal.active) : journal.active);
     next.stage = "overview";
     if (!saveActive(next)) return;
-    sheetId = id; sheetView = currentExercise().started ? "sets" : "preview";
-    candidate = null; renderWorkout(); renderExercise(); sheet.showModal(); sheet.scrollTop = 0;
+    sheetId = id;
+    swapFromList = replace;
+    sheetView = currentExercise().started ? "sets" : "preview";
+    candidate = null;
+    renderWorkout();
+    if (replace) openReplacement();
+    else renderExercise();
+    sheet.showModal(); sheet.scrollTop = 0;
+  }
+
+  function openReplacement() {
+    replaceFilters = { query: "", group: catalog.get(currentExercise()?.id)?.group ?? "", type: "" };
+    sheetView = "replace";
+    renderExercise();
+    sheet.scrollTop = 0;
   }
 
   function renderTargets(exercise) {
@@ -725,7 +746,11 @@ const strengthDashboard = (() => {
         if (!currentExercise() || !candidate) return;
         const id = crypto.randomUUID();
         const next = workoutState.replace(journal.active, sheetId, { id: candidate.id, name: candidate.name, equipment: candidate.type, muscles: primaryMuscles(candidate) }, id);
-        if (saveActive(refreshGuidance(next))) { sheetId = id; sheetView = "preview"; candidate = null; renderWorkout(); renderExercise(); sheet.scrollTop = 0; }
+        if (saveActive(refreshGuidance(next))) {
+          sheetId = id;
+          candidate = null;
+          closeExercise();
+        }
       });
       const cancel = node("button", "plan-button", "Zurück zur Auswahl"); cancel.type = "button";
       cancel.addEventListener("click", () => { candidate = null; sheetView = "replace"; renderExercise(); });
@@ -759,7 +784,7 @@ const strengthDashboard = (() => {
       const targets = node("details", "workout-instructions"); targets.id = "workout-targets-details"; targets.append(node("summary", "", "Wiederholungsbereich und Satzvorgaben anpassen"), renderTargets(exercise)); sheetContent.append(targets);
     }
     const swap = node("button", "plan-button", "Übung austauschen"); swap.type = "button"; swap.id = "workout-swap";
-    swap.addEventListener("click", () => { replaceFilters = { query: "", group: source?.group ?? "", type: "" }; sheetView = "replace"; renderExercise(); sheet.scrollTop = 0; });
+    swap.addEventListener("click", openReplacement);
     const skip = node("button", "text-button", exercise.skipped ? "Übung wieder aufnehmen" : exercise.done.some(Boolean) ? "Offene Sätze überspringen" : "Übung überspringen");
     skip.type = "button"; skip.id = "workout-skip"; skip.disabled = exercise.done.every(Boolean);
     skip.addEventListener("click", () => {
@@ -784,7 +809,15 @@ const strengthDashboard = (() => {
     }
     const count = node("p", "planner-note"), results = node("div", "workout-replacement-results"); results.id = "workout-replace-results";
     const cancel = node("button", "plan-button", "Austausch abbrechen"); cancel.type = "button"; cancel.id = "workout-replace-cancel";
-    cancel.addEventListener("click", () => { sheetView = exercise.started ? "sets" : "preview"; renderExercise(); sheet.scrollTop = 0; });
+    cancel.addEventListener("click", () => {
+      if (swapFromList) {
+        closeExercise();
+        return;
+      }
+      sheetView = exercise.started ? "sets" : "preview";
+      renderExercise();
+      sheet.scrollTop = 0;
+    });
     function update() {
       const matches = catalogSearch.find(replaceFilters.query, replaceFilters.group, replaceFilters.type).filter(({ id }) => id !== exercise.id);
       count.textContent = `${matches.length} passende Übungen`; results.replaceChildren();

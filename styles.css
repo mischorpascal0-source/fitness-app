@@ -918,6 +918,8 @@ a.plan-button { display: inline-flex; align-items: center; text-decoration: none
 .workout-row-progress { color: var(--muted); font-size: .75rem; }
 .workout-row-action { color: var(--accent); font-size: .75rem; font-weight: 650; }
 .workout-grip { flex: none; align-self: stretch; width: 2.75rem; min-height: 2.75rem; padding: 0; margin: var(--space-2) 0; border: 0; border-left: 1px solid var(--border); border-radius: var(--space-2); color: var(--muted); background: transparent; font-size: 1.75rem; cursor: grab; touch-action: none; user-select: none; }
+.workout-list-swap { display: grid; place-items: center; flex: none; width: 2.75rem; min-height: 2.75rem; margin: var(--space-2) 0; padding: 0; border: 0; border-left: 1px solid var(--border); border-radius: var(--space-2); color: var(--accent); background: transparent; cursor: pointer; }
+.workout-list-swap:hover { background: var(--raised); }
 .workout-list-item.is-dragging { position: relative; z-index: 4; border-color: var(--accent); box-shadow: 0 14px 34px rgb(0 0 0 / .45); transition: none; }
 .workout-list-item.is-dragging .workout-grip { cursor: grabbing; }
 .workout-list-item.is-complete { border-color: #938AB9; }

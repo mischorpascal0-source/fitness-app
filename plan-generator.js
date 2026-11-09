@@ -48,6 +48,8 @@ const generateTrainingPlan = (() => {
     core: ["Rumpf", false, ["kh-crunches", "ma-bauchcrunches", "kz-crunches-kniend", "kg-crunches", "kg-dead-bug"]],
   };
   // A pipe-separated slot can be filled by any listed movement.
+  const torso = ["press", "row|pull", "overhead|lateral|rear", "pull|row", "lateral|rear|overhead"];
+  const limbs = ["knee", "hinge", "curl", "triceps", "calf"];
   const patterns = {
     Oberkörper: ["press", "row", "pull|row", "overhead|lateral", "triceps|curl"],
     Unterkörper: ["knee", "hinge", "hamstring|hinge", "calf", "core"],
@@ -55,6 +57,12 @@ const generateTrainingPlan = (() => {
     Pull: ["row", "pull|row", "rear", "curl"],
     Beine: ["knee", "hinge", "hamstring|hinge", "calf", "core"],
     Ganzkörper: ["knee", "press", "row|pull", "hinge", "core|calf"],
+    Torso: torso,
+    Limbs: limbs,
+    "Torso A": torso,
+    "Limbs A": limbs,
+    "Torso B": ["pull|row", "chest|press", "rear|lateral|overhead", "row|pull", "lateral|overhead|rear"],
+    "Limbs B": ["hinge", "quadriceps|knee", "calf", "triceps", "curl"],
   };
   const additionalPatterns = {
     Oberkörper: ["rear|lateral", "curl|triceps|press"],
@@ -63,6 +71,12 @@ const generateTrainingPlan = (() => {
     Pull: ["pull|row", "curl|rear"],
     Beine: ["quadriceps|knee", "abduction|hinge"],
     Ganzkörper: ["overhead|lateral", "pull|hamstring|row"],
+    Torso: ["core", "chest|press"],
+    Limbs: ["hamstring|hinge", "abduction|quadriceps"],
+    "Torso A": ["core", "chest|press"],
+    "Limbs A": ["hamstring|hinge", "abduction|quadriceps"],
+    "Torso B": ["core", "overhead|press"],
+    "Limbs B": ["hamstring|hinge", "abduction|knee"],
   };
   const technical = new Set(["kg-klimmzuege", "kg-pike-pushups", "kh-rumaenisches-kreuzheben-einbeinig", "kh-bulgarian-split-squats"]);
   const compoundAccessories = new Set(["mp-bankdruecken-eng", "lh-bankdruecken-eng", "kg-liegestuetz-eng"]);
@@ -86,10 +100,12 @@ const generateTrainingPlan = (() => {
     options = normalizeOptions(options);
     if (!options) return null;
     const split = splits[options.split];
+    const sessionNames = split.variants?.[options.days] ?? split.sessions;
+    const torsoLimbs = options.split === "torsoLimbs";
     const sameSettings = JSON.stringify(options) === JSON.stringify(normalizeOptions(previous?.options));
     const { setMinutes, restMinutes } = sessionTime;
     const setBudget = Math.floor((options.minutes + restMinutes) / (setMinutes + restMinutes));
-    const maxExercises = Math.max(3, Math.floor(setBudget / 2));
+    const maxExercises = Math.max(torsoLimbs ? 5 : 3, Math.floor(setBudget / 2));
     const additionalSlots = options.minutes >= 75 ? 2 : options.minutes >= 60 ? 1 : 0;
     const usage = new Map();
     const notices = [];
@@ -97,7 +113,7 @@ const generateTrainingPlan = (() => {
     let varied = false;
 
     for (let index = 0; index < options.days; index++) {
-      const name = split.sessions[index % split.sessions.length];
+      const name = sessionNames[index % sessionNames.length];
       const oldIds = new Set(sameSettings ? previous.sessions[index]?.exercises.map(({ id }) => id) : []);
       const selected = [];
       const missing = [];
@@ -120,7 +136,11 @@ const generateTrainingPlan = (() => {
           if (slotIndex < base.length) missing.push(slot.map(([label]) => label).join(" / "));
           continue;
         }
-        const available = [...choices.values()];
+        let available = [...choices.values()];
+        if (torsoLimbs && index >= 2) {
+          const unused = available.filter(({ id }) => !usage.has(id));
+          if (unused.length) available = unused;
+        }
         const fresh = available.filter(({ id }) => !oldIds.has(id));
         const selectedExercise = pick(!varied && fresh.length ? fresh : available, ({ id, type, compound }) => {
           const skill = options.level === "beginner" && (type === "Langhantel" || technical.has(id)) ? .35 : 1;
