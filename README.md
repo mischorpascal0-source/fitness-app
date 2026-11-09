@@ -21,6 +21,20 @@ Das Dashboard zeigt deine erfassten Tageswerte und die heute geplante Einheit au
 
 Unter **Training** findest du den Wochenkalender und die zum gewählten Tag passende Krafttrainingseinheit. **Cardio** hat einen eigenen Navigationspunkt. Die Übungsbibliothek ist über den Trainingsplan erreichbar und bietet Suche und Filter für Muskelgruppe und Gerätetyp. Jede Übungsdetailansicht zeigt eine schematische Beispielposition mit Gerät oder Zubehör. Die Übungsdaten liegen in `exercises.js`, die Bildzuordnungen in `exercise-scenes.js`.
 
+## Lebensmittel suchen und scannen
+
+Unter **Ernährung → + Eintragen** suchst du nach Name, Marke oder Barcode. **Barcode scannen** öffnet die Kamera und liest EAN- und UPC-Barcodes sowie Produkt-QR-Codes mit GTIN. Dafür braucht der Browser Zugriff auf die Kamera und eine HTTPS-Adresse oder `localhost`.
+
+Die App prüft zuerst deine eigenen Lebensmittel und den Katalog in Supabase. Bei einem unbekannten Barcode fragt der Server zusätzlich Open Food Facts ab. Gibt es keinen Treffer, erfasst du den Produktnamen und die Nährwerte pro 100 g oder 100 ml im Dialog **Eigenes Lebensmittel**. Beim Speichern wird der Barcode deinem Konto zugeordnet. Danach kannst du die gegessene Menge auswählen und die Portion separat zum Tagebuch hinzufügen.
+
+### Katalog und Datenquelle
+
+Die Migration `supabase/migrations/20261109000200_fitness_food_catalog.sql` legt den Suchindex und die getrennten Tabellen für öffentliche Produktdaten und private Lebensmittel an. Die Produktsuche benötigt ein Supabase-Konto. Eigene Lebensmittel sind über Row Level Security ausschließlich für das zugehörige Konto zugänglich.
+
+Der Katalog enthält die aufbereiteten, für Deutschland gelisteten Produkte aus dem offiziellen Export vom 7. November 2026. Die Daten stammen von Open Food Facts und stehen unter der Open Database License (ODbL 1.0). [Katalog herunterladen](https://raw.githubusercontent.com/mischorpascal0-source/fitness-app/main/catalog/open-food-facts-de.csv.gz) · [Originalexport](https://static.openfoodfacts.org/data/en.openfoodfacts.org.products.csv.gz) · [Lizenz](https://opendatacommons.org/licenses/odbl/1-0/)
+
+`node scripts/prepare-food-catalog.cjs <export.tsv.gz> <catalog.csv>` erstellt die Importdatei aus dem offiziellen Export. Der Export behält pro Barcode einen Produktnamen, Marke, Packungsgröße, Bezugseinheit, Energie und Makronährstoffe. Die fertige CSV lässt sich nach Anwendung der Migration per PostgreSQL `\copy` in eine leere `public.fitness_food_catalog` laden. Beim Aktualisieren kann sie über eine temporäre Tabelle nach Barcode eingefügt und aktualisiert werden. [Supabase-Datenimport](https://supabase.com/docs/guides/database/import-data)
+
 ## Trainingsplan
 
 Öffne **Training → Wöchentliche Trainingstage ändern**. Wähle Split, Einheiten pro Woche, feste Wochentage, verfügbare Zeit, Ziel, Erfahrung und Equipment. Der Generator wählt Übungen lokal aus der Bibliothek und variiert die Auswahl bei erneuter Erstellung. Mit **Eigenen Plan erstellen** startest du mit einem leeren Plan und legst deine Einheiten selbst an.

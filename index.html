@@ -23,6 +23,8 @@
   <script src="week-calendar.js" defer></script>
   <script src="strength-dashboard.js" defer></script>
   <script src="daily-tracking.js" defer></script>
+  <script src="food-code.js" defer></script>
+  <script src="food-catalog.js" defer></script>
   <script src="cardio-suggestions.js" defer></script>
   <script src="cardio-session.js" defer></script>
   <script src="app.js" defer></script>
@@ -593,7 +595,22 @@
   </dialog>
   <dialog id="food-dialog" aria-labelledby="food-title">
     <div class="detail-header"><h2 id="food-title">Essen eintragen</h2><form method="dialog"><button class="plan-button">Schließen</button></form></div>
+    <form id="food-lookup-form" class="food-lookup">
+      <label class="plan-editor-label">Lebensmittel suchen oder Barcode eingeben<input name="query" type="search" maxlength="80" required autocomplete="off" placeholder="z. B. Skyr oder EAN"></label>
+      <div class="planner-actions">
+        <button class="plan-button primary" type="submit">Suchen</button>
+        <button class="plan-button" id="food-scan-open" type="button" aria-haspopup="dialog">Barcode scannen</button>
+      </div>
+      <p class="planner-note" id="food-lookup-status" role="status"></p>
+      <ul class="entry-list" id="food-lookup-results" aria-label="Gefundene Lebensmittel" hidden></ul>
+      <small class="planner-note">Produktdaten von <a href="https://world.openfoodfacts.org/data" target="_blank" rel="noopener noreferrer">Open Food Facts</a> unter <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener noreferrer">ODbL</a> · <a href="https://raw.githubusercontent.com/mischorpascal0-source/fitness-app/main/catalog/open-food-facts-de.csv.gz" target="_blank" rel="noopener noreferrer">Katalog herunterladen</a></small>
+    </form>
     <form id="food-form" class="library-controls">
+      <div id="food-portion" class="full-row food-portion" hidden>
+        <label class="plan-editor-label"><span id="food-portion-label">Gegessene Menge in g</span><input name="amount" type="number" min="0.1" max="10000" step="any" value="100" inputmode="decimal" required disabled></label>
+        <p class="planner-note" id="food-portion-source"></p>
+        <button class="text-button" id="food-clear-selection" type="button">Auswahl lösen</button>
+      </div>
       <label class="full-row">Lebensmittel oder Mahlzeit <input name="foodName" maxlength="100" placeholder="z. B. Haferflocken mit Joghurt" required></label>
       <label>Datum <input name="date" type="date" required></label>
       <label>Mahlzeit <select name="meal"><option>Frühstück</option><option>Mittagessen</option><option>Abendessen</option><option>Snacks</option></select></label>
@@ -602,6 +619,27 @@
       <label>Kohlenhydrate in g <input name="carbs" type="number" min="0" max="2000" step=".1" value="0" required></label>
       <label>Fett in g <input name="fat" type="number" min="0" max="2000" step=".1" value="0" required></label>
       <button class="plan-button primary full-row" type="submit">Zum Tagebuch hinzufügen</button><p class="planner-note form-status full-row" role="status"></p>
+    </form>
+  </dialog>
+  <dialog id="food-scan-dialog" aria-labelledby="food-scan-title">
+    <div class="detail-header"><h2 id="food-scan-title">Barcode scannen</h2><form method="dialog"><button class="plan-button">Schließen</button></form></div>
+    <p class="planner-note">Halte den Barcode oder Produkt-QR-Code vor die Kamera.</p>
+    <video id="food-scan-video" autoplay muted playsinline hidden aria-label="Kameravorschau"></video>
+    <p class="planner-note" id="food-scan-status" role="status"></p>
+  </dialog>
+  <dialog id="food-missing-dialog" aria-labelledby="food-missing-title">
+    <div class="detail-header"><h2 id="food-missing-title">Eigenes Lebensmittel</h2><form method="dialog"><button class="plan-button">Abbrechen</button></form></div>
+    <p class="planner-note" id="food-missing-context"></p>
+    <p class="planner-note">Barcode <strong id="food-missing-code"></strong></p>
+    <form class="library-controls" id="food-missing-form">
+      <label class="full-row">Produktname <input name="name" maxlength="100" required autofocus></label>
+      <label class="full-row">Nährwerte auf dem Etikett pro <select name="unit"><option value="g">100 g</option><option value="ml">100 ml</option></select></label>
+      <label>Energie in kcal <input name="kcal" type="number" min="0" max="2000" step="any" inputmode="decimal" required></label>
+      <label>Eiweiß in g <input name="protein" type="number" min="0" max="200" step="any" inputmode="decimal" required></label>
+      <label>Kohlenhydrate in g <input name="carbs" type="number" min="0" max="200" step="any" inputmode="decimal" required></label>
+      <label>Fett in g <input name="fat" type="number" min="0" max="200" step="any" inputmode="decimal" required></label>
+      <button class="plan-button primary full-row" type="submit">Lebensmittel speichern</button>
+      <p class="planner-note full-row" id="food-missing-status" role="status"></p>
     </form>
   </dialog>
   <dialog id="cardio-dialog" aria-labelledby="cardio-title">

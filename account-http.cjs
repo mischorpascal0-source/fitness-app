@@ -128,6 +128,9 @@ async function routeAccountRequest(request, response, pathname, origin, handleAc
     if (pathname === "/api/social" && !handleAccounts.resolveSession) {
       return sendJson(response, 503, { error: "Social benötigt die Supabase-Kontospeicherung." });
     }
+    if (pathname === "/api/foods" && !handleAccounts.resolveSession) {
+      return sendJson(response, 503, { error: "Der Lebensmittelkatalog benötigt die Supabase-Kontospeicherung." });
+    }
     if (pathname === "/api/garmin") {
       return await require("./cardio-garmin.cjs")(request, response, origin, handleAccounts);
     }

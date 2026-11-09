@@ -1,6 +1,7 @@
 const { createHash, randomBytes } = require("node:crypto");
 const { readJson, planIdFromPath, readEmail, readRegistration } = require("./account-http.cjs");
 const { normalizePlan } = require("./plan-data.js");
+const { foodCatalog, FoodCatalogError } = require("./food-catalog.cjs");
 
 const cookieNames = { access: "fitness_cloud_access", refresh: "fitness_cloud_refresh" };
 const maxSessionAge = 7 * 24 * 60 * 60;
@@ -171,6 +172,19 @@ function createSupabaseAccounts(baseUrl, publishableKey) {
 
   const record = ({ id, data, version }) => ({ id, plan: data, version });
 
+  async function foodRequest(request, session) {
+    if (request.method !== "POST") throw new CloudError(405, "Diese Anfrage wird nicht unterstützt.");
+    return foodCatalog(await readJson(request), async (path, options) => {
+      const result = await call(path, { ...options, token: session.access_token });
+      if (result.ok && Array.isArray(result.body)) return result.body;
+      if (result.status === 401) throw new CloudError(401, "Deine Sitzung ist abgelaufen. Melde dich erneut an.");
+      if (["PGRST202", "PGRST205", "42883", "42P01"].includes(result.body?.code)) {
+        throw new CloudError(503, "Der Lebensmittelkatalog ist noch nicht eingerichtet.");
+      }
+      throw new CloudError(502, "Der Lebensmittelkatalog ist gerade nicht erreichbar.");
+    });
+  }
+
   async function socialRequest(request, session) {
     const input = request.method === "GET" ? { action: "state" }
       : request.method === "POST" ? await readJson(request) : null;
@@ -200,7 +214,7 @@ function createSupabaseAccounts(baseUrl, publishableKey) {
         return await authenticate(request, response, sendJson, origin, pathname === "/api/register");
       }
       const id = planIdFromPath(pathname);
-      if (!id && !["/api/session", "/api/logout", "/api/plans", "/api/social"].includes(pathname)) {
+      if (!id && !["/api/session", "/api/logout", "/api/plans", "/api/social", "/api/foods"].includes(pathname)) {
         return sendJson(response, 404, { error: "Seite nicht gefunden." });
       }
       const session = await getSession(request, response, origin);
@@ -221,6 +235,7 @@ function createSupabaseAccounts(baseUrl, publishableKey) {
       }
       if (!session) throw new CloudError(401, "Melde dich an, um fortzufahren.");
       if (pathname === "/api/social") return sendJson(response, 200, await socialRequest(request, session));
+      if (pathname === "/api/foods") return sendJson(response, 200, await foodRequest(request, session));
       if (method === "GET" && pathname === "/api/plans") {
         return sendJson(response, 200, { plans: await plansRequest(session, { list: true }) });
       }
@@ -255,7 +270,7 @@ function createSupabaseAccounts(baseUrl, publishableKey) {
       }
       return sendJson(response, 405, { error: "Diese Anfrage wird nicht unterstützt." });
     } catch (error) {
-      if (error instanceof CloudError) return sendJson(response, error.status, { error: error.message });
+      if (error instanceof CloudError || error instanceof FoodCatalogError) return sendJson(response, error.status, { error: error.message });
       throw error;
     }
   }

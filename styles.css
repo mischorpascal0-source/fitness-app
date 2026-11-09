@@ -800,6 +800,11 @@ a.plan-button { display: inline-flex; align-items: center; text-decoration: none
 .social-stats { grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); }
 #social-share-preview, #social-recipients label { overflow-wrap: anywhere; min-width: 0; }
 .date-control input { min-width: 0; max-width: 9rem; min-height: 2.75rem; padding: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--raised); color: var(--text); font: inherit; font-size: var(--text-small); }
+.food-lookup, .food-portion { padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-control); }
+.food-lookup .planner-actions { margin-block: var(--space-2); }
+#food-lookup-results li { flex-wrap: wrap; }
+#food-lookup-results button { flex-shrink: 0; }
+#food-scan-video { width: 100%; max-height: 44dvh; object-fit: contain; border-radius: var(--radius-control); background: var(--background); }
 #nutrition-view:not([hidden]), #cardio-view:not([hidden]), #mobility-view:not([hidden]) { display: grid; gap: var(--space-4); }
 .calorie-overview { display: flex; align-items: center; justify-content: space-around; gap: var(--space-3); }
 .calorie-ring { display: grid; place-items: center; width: clamp(8rem, 35vw, 11rem); aspect-ratio: 1; border-radius: 50%; background: conic-gradient(var(--accent) var(--calorie-progress, 0%), var(--raised) 0); position: relative; flex: none; }
