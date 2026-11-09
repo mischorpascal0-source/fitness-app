@@ -25,3 +25,9 @@
   #garmin-cardio .garmin-totals { grid-template-columns: repeat(2,minmax(0,1fr)); }
   #garmin-cardio .planner-actions > button { width: 100%; }
 }
+
+.garmin-recovery { border-block: 1px solid var(--border, #d9e2df); padding-block: 1.25rem; margin-block: 1.25rem; }
+.garmin-recovery select { display: block; margin-block: .5rem 1rem; padding: .65rem; max-width: 100%; }
+#garmin-recommendation { border-left: 4px solid #67887b; padding: .5rem 1rem; background: #edf4ef; border-radius: .4rem; }
+#garmin-recommendation[data-level="high"], #garmin-recommendation[data-level="moderate"] { border-color: #af7426; background: #fff5e4; }
+#garmin-recommendation h4 { margin-top: .5rem; }
