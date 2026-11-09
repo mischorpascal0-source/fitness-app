@@ -12,7 +12,9 @@ const dailyTracking = (() => {
   const stepsSource = document.querySelector("#steps-source");
   const stepsSync = document.querySelector("#steps-garmin-sync");
   const stepsStatus = document.querySelector("#steps-garmin-status");
+  const foodDialog = document.querySelector("#food-dialog");
   const foodForm = document.querySelector("#food-form");
+  const foodMeal = foodForm.elements.meal;
   const cardioForm = document.querySelector("#cardio-form");
   const weightForm = document.querySelector("#weight-form");
   const nutritionStatus = document.querySelector("#nutrition-status");
@@ -224,18 +226,32 @@ const dailyTracking = (() => {
     ring.querySelector("small").textContent = remaining < 0 ? "kcal über Ziel" : "kcal übrig";
     ring.style.setProperty("--calorie-progress", Math.min(100, sum.calories / data.goals.calories * 100) + "%");
     renderMacros("#nutrition-macros", sum);
-    document.querySelector("#nutrition-meals").replaceChildren(...mealNames.map((meal) => {
+    document.querySelector("#nutrition-meals").replaceChildren(...mealNames.map((meal, index) => {
       const items = entries.filter((entry) => entry.meal === meal);
       const card = document.createElement("section");
       card.className = "card library-panel";
-      const header = document.createElement("div");
-      header.className = "meal-heading";
       const title = document.createElement("h3");
-      title.textContent = meal;
+      const open = document.createElement("button");
+      open.type = "button";
+      open.id = "meal-open-" + index;
+      open.className = "meal-open";
+      open.setAttribute("aria-label", meal + " eintragen");
+      open.setAttribute("aria-haspopup", "dialog");
+      open.setAttribute("aria-controls", "food-dialog");
+      open.addEventListener("click", () => openFoodForm(meal));
+      const name = document.createElement("span");
+      name.textContent = meal;
       const calories = document.createElement("span");
+      calories.id = "meal-calories-" + index;
+      calories.className = "meal-calories";
       calories.textContent = format.format(totals(items).calories) + " kcal";
-      header.append(title, calories);
-      card.append(header);
+      open.setAttribute("aria-describedby", calories.id);
+      const add = document.createElement("span");
+      add.className = "meal-add";
+      add.textContent = "+ Eintragen";
+      open.append(name, calories, add);
+      title.append(open);
+      card.append(title);
       if (items.length) {
         const list = document.createElement("ul");
         list.className = "entry-list";
@@ -331,13 +347,15 @@ const dailyTracking = (() => {
     document.dispatchEvent(new Event("fitness:dailychange"));
   }
 
+  function showForm(dialog, form, prepare) {
+    form.reset();
+    form.querySelector(".form-status").textContent = "";
+    prepare();
+    dialog.showModal();
+  }
+
   function openForm(buttonId, dialogId, form, prepare) {
-    document.querySelector(buttonId).addEventListener("click", () => {
-      form.reset();
-      form.querySelector(".form-status").textContent = "";
-      prepare?.();
-      document.querySelector(dialogId).showModal();
-    });
+    document.querySelector(buttonId).addEventListener("click", () => showForm(document.querySelector(dialogId), form, prepare));
   }
 
   openForm("#daily-open", "#daily-dialog", dailyForm, () => {
@@ -377,9 +395,18 @@ const dailyTracking = (() => {
     }, dailyForm.querySelector(".form-status"))) document.querySelector("#daily-dialog").close();
   });
 
-  openForm("#food-open", "#food-dialog", foodForm, () => {
-    foodForm.elements.date.value = keyForDate(nutritionDate);
-  });
+  function openFoodForm(meal) {
+    showForm(foodDialog, foodForm, () => {
+      fitnessFoodCatalog.reset();
+      foodForm.elements.date.value = keyForDate(nutritionDate);
+      foodMeal.disabled = Boolean(meal);
+      foodMeal.closest("label").hidden = Boolean(meal);
+      if (meal) foodMeal.value = meal;
+      document.querySelector("#food-title").textContent = meal ? meal + " eintragen" : "Essen eintragen";
+    });
+  }
+
+  document.querySelector("#food-open").addEventListener("click", () => openFoodForm());
   foodForm.addEventListener("submit", (event) => {
     event.preventDefault();
     if (!foodForm.reportValidity()) return;
@@ -389,14 +416,15 @@ const dailyTracking = (() => {
       foodForm.reportValidity();
       return;
     }
-    const entry = { id: crypto.randomUUID(), date: foodForm.elements.date.value, name, meal: foodForm.elements.meal.value };
+    const entry = { id: crypto.randomUUID(), date: foodForm.elements.date.value, name, meal: foodMeal.value };
     for (const field of ["calories", "protein", "carbs", "fat"]) entry[field] = foodForm.elements[field].valueAsNumber;
     if (commit((next) => next.foods.push(entry), foodForm.querySelector(".form-status"))) {
       if (entry.date !== keyForDate(nutritionDate)) {
         nutritionDate = new Date(entry.date + "T12:00:00");
         renderNutrition();
       }
-      document.querySelector("#food-dialog").close();
+      foodDialog.close();
+      if (foodMeal.disabled) document.getElementById("meal-open-" + mealNames.indexOf(entry.meal))?.focus();
     }
   });
 

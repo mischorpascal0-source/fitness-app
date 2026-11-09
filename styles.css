@@ -821,8 +821,10 @@ a.plan-button { display: inline-flex; align-items: center; text-decoration: none
 .macro-grid > div:nth-child(3) { border-color: #CEB2E9; }
 .macro-grid small { color: var(--muted); font-size: .6875rem; overflow-wrap: anywhere; }
 .meal-list { display: grid; gap: var(--space-3); }
-.meal-heading { display: flex; justify-content: space-between; gap: var(--space-3); }
-.meal-heading span { color: var(--muted); font-size: var(--text-small); }
+.meal-open { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); width: 100%; min-height: 2.75rem; padding: 0; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.meal-calories { color: var(--muted); font-size: var(--text-small); font-weight: 400; }
+.meal-add { margin-inline-start: auto; color: var(--accent); font-size: var(--text-small); font-weight: 650; }
+.meal-open:hover .meal-add { text-decoration: underline; }
 .meal-empty { margin-top: var(--space-2); color: var(--muted); font-size: var(--text-small); }
 .activity-chart { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); align-items: end; gap: var(--space-2); height: 9rem; }
 .activity-chart > div { display: grid; grid-template-rows: auto 1fr auto; align-items: end; justify-items: center; gap: var(--space-1); height: 100%; min-width: 0; }

@@ -178,6 +178,9 @@ function createSupabaseAccounts(baseUrl, publishableKey) {
       const result = await call(path, { ...options, token: session.access_token });
       if (result.ok && Array.isArray(result.body)) return result.body;
       if (result.status === 401) throw new CloudError(401, "Deine Sitzung ist abgelaufen. Melde dich erneut an.");
+      if (result.body?.code === "PT409") {
+        throw new CloudError(409, "Die Freigabe hat sich geändert. Lade die App neu und suche den Barcode erneut.");
+      }
       if (["PGRST202", "PGRST205", "42883", "42P01"].includes(result.body?.code)) {
         throw new CloudError(503, "Der Lebensmittelkatalog ist noch nicht eingerichtet.");
       }

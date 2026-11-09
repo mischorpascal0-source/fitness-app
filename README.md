@@ -25,11 +25,15 @@ Unter **Training** findest du den Wochenkalender und die zum gewählten Tag pass
 
 Unter **Ernährung → + Eintragen** suchst du nach Name, Marke oder Barcode. **Barcode scannen** öffnet die Kamera und liest EAN- und UPC-Barcodes sowie Produkt-QR-Codes mit GTIN. Dafür braucht der Browser Zugriff auf die Kamera und eine HTTPS-Adresse oder `localhost`.
 
-Die App prüft zuerst deine eigenen Lebensmittel und den Katalog in Supabase. Bei einem unbekannten Barcode fragt der Server zusätzlich Open Food Facts ab. Gibt es keinen Treffer, erfasst du den Produktnamen und die Nährwerte pro 100 g oder 100 ml im Dialog **Eigenes Lebensmittel**. Beim Speichern wird der Barcode deinem Konto zugeordnet. Danach kannst du die gegessene Menge auswählen und die Portion separat zum Tagebuch hinzufügen.
+Tippe im Ernährungstagebuch direkt auf **Frühstück**, **Mittagessen**, **Abendessen** oder **Snacks**, um eine Portion für diese Mahlzeit am gewählten Kalendertag einzutragen.
+
+Die App prüft zuerst deine eigenen Lebensmittel und den Katalog in Supabase. Bei einem unbekannten Barcode fragt der Server zusätzlich Open Food Facts ab. Gibt es keinen Treffer, erfasst du den Produktnamen und die Nährwerte pro 100 g oder 100 ml. Im Dialog **Eigenes Lebensmittel** wird der Barcode deinem Konto zugeordnet. Administratoren speichern über **Für alle speichern** im gemeinsamen Katalog. Alle angemeldeten Nutzer finden diese Produkte über die Suche und den Barcode. Danach kannst du die gegessene Menge auswählen und die Portion separat zum Tagebuch hinzufügen.
 
 ### Katalog und Datenquelle
 
 Die Migration `supabase/migrations/20261109000200_fitness_food_catalog.sql` legt den Suchindex und die getrennten Tabellen für öffentliche Produktdaten und private Lebensmittel an. Die Produktsuche benötigt ein Supabase-Konto. Eigene Lebensmittel sind über Row Level Security ausschließlich für das zugehörige Konto zugänglich.
+
+Die Migration `supabase/migrations/20261109000300_fitness_shared_foods.sql` ergänzt den gemeinsamen Katalog und die Admin-Freigabe. Die Freigabe wird in Supabase in `fitness_accounts_private.app_admins` über die ID des jeweiligen bestätigten Kontos erteilt. Sie erlaubt das Anlegen von Produkten im gemeinsamen Katalog.
 
 Der Katalog enthält die aufbereiteten, für Deutschland gelisteten Produkte aus dem offiziellen Export vom 7. November 2026. Die Daten stammen von Open Food Facts und stehen unter der Open Database License (ODbL 1.0). [Katalog herunterladen](https://raw.githubusercontent.com/mischorpascal0-source/fitness-app/main/catalog/open-food-facts-de.csv.gz) · [Originalexport](https://static.openfoodfacts.org/data/en.openfoodfacts.org.products.csv.gz) · [Lizenz](https://opendatacommons.org/licenses/odbl/1-0/)
 

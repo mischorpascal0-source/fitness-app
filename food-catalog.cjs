@@ -2,8 +2,6 @@ const { normalize } = require("./food-code.js");
 
 const nutrientLimits = { kcal: 2000, protein: 200, carbs: 200, fat: 200 };
 const nutrientNames = { kcal: "energy-kcal", protein: "proteins", carbs: "carbohydrates", fat: "fat" };
-const ownFields = "barcode,name,unit,kcal,protein,carbs,fat";
-const catalogFields = ownFields + ",brand,quantity";
 
 class FoodCatalogError extends Error {
   constructor(status, message) {
@@ -16,7 +14,7 @@ function nutrient(value, max) {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= max ? value : null;
 }
 
-function ownProduct(input, barcode) {
+function manualProduct(input, barcode) {
   const name = typeof input.name === "string" ? input.name.trim() : "";
   const unit = input.unit;
   const values = Object.fromEntries(Object.entries(nutrientLimits).map(([key, limit]) => [key, nutrient(input[key], limit)]));
@@ -64,22 +62,19 @@ async function foodCatalog(input, query, fetcher = fetch) {
   if (!barcode) throw new FoodCatalogError(400, "Gib einen gültigen Produktbarcode ein.");
 
   if (input.action === "save") {
-    const fields = new URLSearchParams({ on_conflict: "owner_id,barcode", select: ownFields });
-    const [saved] = await query("/rest/v1/fitness_own_foods?" + fields, {
-      method: "POST", data: ownProduct(input, barcode),
-      prefer: "resolution=merge-duplicates,return=representation,missing=default",
+    const [saved] = await query("/rest/v1/rpc/fitness_food_save", {
+      method: "POST",
+      data: { p_food: manualProduct(input, barcode), p_expected_shared: input.expectedShared === true },
     });
     if (!saved) throw new FoodCatalogError(502, "Das Lebensmittel konnte nicht gespeichert werden.");
-    return { product: { ...saved, source: "own" } };
+    return { product: saved };
   }
 
-  const fields = new URLSearchParams({ barcode: "eq." + barcode, select: ownFields });
-  const [own] = await query("/rest/v1/fitness_own_foods?" + fields);
-  if (own) return { product: { ...own, source: "own" } };
-  fields.set("select", catalogFields);
-  const [shared] = await query("/rest/v1/fitness_food_catalog?" + fields);
-  if (shared) return { product: { ...shared, source: "off" } };
-  return lookupOpenFoodFacts(barcode, fetcher);
+  const [match] = await query("/rest/v1/rpc/fitness_food_barcode", { method: "POST", data: { p_barcode: barcode } });
+  const { can_share: canShare, ...product } = match ?? {};
+  if (product.barcode) return { product };
+  const fallback = await lookupOpenFoodFacts(barcode, fetcher);
+  return fallback.product ? fallback : { ...fallback, canShare: canShare === true };
 }
 
 module.exports = { foodCatalog, FoodCatalogError };

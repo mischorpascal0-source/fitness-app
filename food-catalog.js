@@ -14,7 +14,8 @@ const fitnessFoodCatalog = (() => {
   const scanStatus = document.querySelector("#food-scan-status");
   const video = document.querySelector("#food-scan-video");
   const nutrients = { kcal: "calories", protein: "protein", carbs: "carbs", fat: "fat" };
-  let accountId, product, missingBarcode, lookupController, saveController, camera, scannerScript;
+  const sourceNames = { own: "Eigenes Lebensmittel", shared: "Gemeinsamer Katalog", off: "Open Food Facts" };
+  let accountId, product, missingBarcode, missingShared, lookupController, saveController, camera, scannerScript;
 
   async function request(action, payload, controller) {
     const response = await fetch("/api/foods", {
@@ -40,7 +41,7 @@ const fitnessFoodCatalog = (() => {
   function selectProduct(next) {
     product = next;
     foodForm.elements.foodName.value = product.name.slice(0, 100);
-    const source = product.source === "own" ? "Eigenes Lebensmittel" : "Open Food Facts";
+    const source = sourceNames[product.source];
     const incomplete = Object.keys(nutrients).some((key) => product[key] == null);
     document.querySelector("#food-portion-source").textContent = incomplete
       ? source + " · Ergänze die fehlenden Werte für deine Menge vom Etikett." : source;
@@ -63,7 +64,7 @@ const fitnessFoodCatalog = (() => {
       const title = document.createElement("strong");
       title.textContent = item.name;
       const detail = document.createElement("small");
-      detail.textContent = [item.brand, item.quantity, item.source === "own" ? "Eigenes Lebensmittel" : "Open Food Facts"].filter(Boolean).join(" · ");
+      detail.textContent = [item.brand, item.quantity, sourceNames[item.source]].filter(Boolean).join(" · ");
       const choose = document.createElement("button");
       choose.type = "button";
       choose.className = "plan-button";
@@ -76,14 +77,19 @@ const fitnessFoodCatalog = (() => {
     }));
   }
 
-  function addMissing(barcode, unavailable) {
+  function addMissing(barcode, unavailable, canShare) {
     missingBarcode = barcode;
+    missingShared = canShare === true;
     missingForm.reset();
     missingStatus.textContent = "";
     document.querySelector("#food-missing-code").textContent = barcode;
-    document.querySelector("#food-missing-context").textContent = unavailable
-      ? "Open Food Facts ist gerade nicht erreichbar. Du kannst das Produkt mit den Werten vom Etikett in deinem Konto speichern."
-      : "Zu diesem Barcode wurde kein Produkt gefunden. Speichere die Werte vom Etikett in deinem Konto.";
+    document.querySelector("#food-missing-title").textContent = missingShared ? "Neues Katalogprodukt" : "Eigenes Lebensmittel";
+    const reason = unavailable ? "Open Food Facts ist gerade nicht erreichbar." : "Zu diesem Barcode wurde kein Produkt gefunden.";
+    const audience = missingShared
+      ? "Als Administrator der App speicherst du das Produkt für alle angemeldeten Nutzer."
+      : "Speichere die Werte vom Etikett in deinem Konto.";
+    document.querySelector("#food-missing-context").textContent = reason + " " + audience;
+    missingSave.textContent = missingShared ? "Für alle speichern" : "Lebensmittel speichern";
     if (!missingDialog.open) missingDialog.showModal();
   }
 
@@ -104,7 +110,7 @@ const fitnessFoodCatalog = (() => {
       else if (data.product) selectProduct(data.product);
       else {
         lookupStatus.textContent = "";
-        addMissing(payload.barcode, data.unavailable);
+        addMissing(payload.barcode, data.unavailable, data.canShare);
       }
     } catch (error) {
       if (lookupController === controller) lookupStatus.textContent = error.message;
@@ -188,6 +194,7 @@ const fitnessFoodCatalog = (() => {
     if (missingDialog.open) missingDialog.close();
     stopCamera();
     missingBarcode = undefined;
+    missingShared = false;
     product = undefined;
     portion.hidden = true;
     amount.disabled = true;
@@ -223,6 +230,7 @@ const fitnessFoodCatalog = (() => {
     try {
       const { product } = await request("save", {
         barcode: missingBarcode,
+        expectedShared: missingShared,
         name: missingForm.elements.name.value.trim(),
         unit: missingForm.elements.unit.value,
         ...Object.fromEntries(Object.keys(nutrients).map((key) => [key, missingForm.elements[key].valueAsNumber])),
@@ -230,7 +238,9 @@ const fitnessFoodCatalog = (() => {
       if (saveController !== controller || !missingDialog.open) return;
       missingDialog.close();
       selectProduct(product);
-      lookupStatus.textContent = "Lebensmittel mit Barcode im Konto gespeichert.";
+      lookupStatus.textContent = product.source === "shared"
+        ? "Lebensmittel mit Barcode für alle im gemeinsamen Katalog gespeichert."
+        : "Lebensmittel mit Barcode im Konto gespeichert.";
     } catch (error) {
       if (saveController === controller) missingStatus.textContent = error.message;
     } finally {
@@ -247,8 +257,7 @@ const fitnessFoodCatalog = (() => {
     amount.disabled = true;
     foodForm.elements.foodName.focus();
   });
-  document.querySelector("#food-open").addEventListener("click", reset);
   foodDialog.addEventListener("close", () => { if (!foodDialog.open) reset(); });
 
-  return { setAccount(id) { reset(); accountId = id; } };
+  return { reset, setAccount(id) { reset(); accountId = id; } };
 })();
