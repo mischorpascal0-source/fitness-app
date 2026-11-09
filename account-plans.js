@@ -130,6 +130,7 @@
     appShell.hidden = !signedIn;
     navigation.hidden = !signedIn;
     userLabel.textContent = account ? `Angemeldet als ${account.username}` : "";
+    fitnessSocial.setAccount(account?.id);
     strengthDashboard.setAccount(account?.id);
     dailyTracking.setAccount(account?.id);
     cardioGarmin.setAccount(account?.id);

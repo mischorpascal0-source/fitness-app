@@ -785,6 +785,20 @@ a.plan-button { display: inline-flex; align-items: center; text-decoration: none
 .entry-list li > div { min-width: 0; flex: 1; display: grid; gap: var(--space-1); overflow-wrap: anywhere; }
 .entry-list small { color: var(--muted); font-size: var(--text-small); }
 .entry-list .icon-button { background: transparent; }
+
+#social-view:not([hidden]), #social-content:not([hidden]), #social-connections {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+}
+#social-view h2, #social-view h3, #social-friend-dialog h2 { overflow-wrap: anywhere; }
+#social-view .entry-list li { flex-wrap: wrap; }
+#social-view .entry-list li > div:first-child { flex-basis: 9rem; }
+.social-handle { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); margin-block: var(--space-3); overflow-wrap: anywhere; }
+.social-row-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+#social-view .social-row-actions { display: flex; justify-content: flex-start; }
+.social-stats { grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); }
+#social-share-preview, #social-recipients label { overflow-wrap: anywhere; min-width: 0; }
 .date-control input { min-width: 0; max-width: 9rem; min-height: 2.75rem; padding: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--raised); color: var(--text); font: inherit; font-size: var(--text-small); }
 #nutrition-view:not([hidden]), #cardio-view:not([hidden]), #mobility-view:not([hidden]) { display: grid; gap: var(--space-4); }
 .calorie-overview { display: flex; align-items: center; justify-content: space-around; gap: var(--space-3); }

@@ -25,11 +25,13 @@
   <script src="cardio-suggestions.js" defer></script>
   <script src="cardio-session.js" defer></script>
   <script src="app.js" defer></script>
+  <script src="social.js" defer></script>
   <script src="account-plans.js" defer></script>
 </head>
 <body>
   <svg class="icons" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
     <symbol id="icon-home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></symbol>
+    <symbol id="icon-social" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2M16 5a3 3 0 0 1 0 6m2 3a4 4 0 0 1 3 4v2"/></symbol>
     <symbol id="icon-profile" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></symbol>
     <symbol id="icon-mobility" viewBox="0 0 24 24"><circle cx="12" cy="4" r="2"/><path d="m4 9 8 2 8-2m-8 2v5m0 0-6 5m6-5 6 5"/></symbol>
     <symbol id="icon-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/></symbol>
@@ -138,6 +140,7 @@
         <h2 class="dashboard-label" id="home-improve-title">Für deine Balance</h2>
         <a class="card shortcut" href="#mobility"><span><strong>Deine Mobility-Routine</strong><small>Ein paar Minuten für deine Beweglichkeit.</small></span><svg class="mobility-accent" aria-hidden="true"><use href="#icon-mobility"/></svg></a>
       </section>
+      <a class="card shortcut" href="#social"><span><strong>Social</strong><small>Freunde, Wochenstatistiken und geteilte Trainings</small></span><svg aria-hidden="true"><use href="#icon-social"/></svg></a>
     </div>
     <section id="strength-dashboard" hidden>
       <section class="card library-panel calendar-panel" aria-label="Trainingskalender">
@@ -161,6 +164,7 @@
         <a class="plan-button" id="strength-empty-plan" href="#trainingsplan">Trainingstage ändern</a>
       </section>
       <p id="strength-status" class="planner-note" role="status"></p>
+      <button id="strength-share-latest" class="plan-button" type="button" aria-haspopup="dialog" hidden>Training teilen</button>
       <p id="strength-active-note" class="planner-note" hidden></p>
       <a class="card library-panel session-card mobility-session-card" href="#mobility">
         <div class="session-card-heading"><span class="session-icon"><svg aria-hidden="true"><use href="#icon-mobility"/></svg></span><h2>Mobility</h2><span class="card-menu-decoration" aria-hidden="true">›</span></div>
@@ -403,6 +407,49 @@
       </aside>
       <div id="plan-result" tabindex="-1"></div>
     </section>
+    <section id="social-view" aria-label="Social" hidden>
+      <section class="card library-panel" aria-labelledby="social-settings-title">
+        <h2 id="social-settings-title">Deine Social-Einstellungen</h2>
+        <p class="planner-note">Du entscheidest, welche Statistiken deine bestätigten Freunde sehen.</p>
+        <form id="social-enable" class="library-controls" hidden>
+          <label>Dein Name <input name="name" required minlength="3" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" autocomplete="off" aria-describedby="social-name-hint"></label>
+          <p class="planner-note" id="social-name-hint">3–20 Buchstaben (A–Z), Ziffern oder Unterstriche. Die App ergänzt vier Ziffern, zum Beispiel Pascal#1298.</p>
+          <button class="plan-button primary" type="submit">Social einschalten</button>
+        </form>
+        <div id="social-profile" hidden>
+          <div class="social-handle"><strong id="social-handle"></strong><button class="plan-button" id="social-copy" type="button">Kopieren</button></div>
+          <fieldset id="social-categories" class="training-days" hidden>
+            <legend>Für bestätigte Freunde freigeben</legend>
+            <div class="plan-equipment-options">
+              <label><input type="checkbox" name="strength">Krafttraining</label>
+              <label><input type="checkbox" name="cardio">Cardio</label>
+              <label><input type="checkbox" name="nutrition">Ernährung</label>
+            </div>
+            <p class="planner-note">Wochenstatistiken werden von Geräten aktualisiert, auf denen du angemeldet bist. Krafttraining erlaubt zusätzlich das gezielte Teilen einzelner Einheiten.</p>
+          </fieldset>
+          <div class="planner-actions"><button class="plan-button" id="social-toggle" type="button"></button></div>
+        </div>
+        <button class="plan-button" id="social-retry" type="button" hidden>Erneut laden</button>
+        <p id="social-status" class="planner-note" role="status"></p>
+        <p id="social-sync-status" class="planner-note" role="status"></p>
+      </section>
+      <div id="social-content" hidden>
+        <section class="card library-panel" aria-labelledby="social-friends-title">
+          <h2 id="social-friends-title">Freunde</h2>
+          <form id="social-search" class="library-controls">
+            <label>Vollständiger Nutzername <input name="handle" required maxlength="25" pattern="[A-Za-z0-9_]{3,20}#[0-9]{4}" placeholder="Pascal#1298" autocomplete="off" autocapitalize="off"></label>
+            <button class="plan-button" type="submit">Profil suchen</button>
+          </form>
+          <ul id="social-match" class="entry-list" aria-label="Suchergebnis" hidden></ul>
+          <div id="social-connections"></div>
+        </section>
+        <section class="card library-panel" aria-labelledby="social-shares-title">
+          <h2 id="social-shares-title">Deine geteilten Trainings</h2>
+          <p class="planner-note" id="social-shares-empty"></p>
+          <ul id="social-shares" class="entry-list"></ul>
+        </section>
+      </div>
+    </section>
   </main>
   <nav class="bottom-nav" aria-label="Hauptnavigation" hidden>
     <div class="nav-inner">
@@ -496,7 +543,24 @@
     <p id="workout-exercise-status" class="planner-note" role="status"></p>
   </dialog>
   <button id="active-workout" class="active-workout" type="button" hidden><span class="live-dot"></span><span><strong>Training läuft</strong><small id="active-workout-name"></small></span><svg aria-hidden="true"><use href="#icon-arrow"/></svg></button>
-  <dialog id="account-dialog" aria-labelledby="account-dialog-title"><div class="detail-header"><h2 id="account-dialog-title">Dein Konto</h2><form method="dialog"><button class="plan-button" type="submit">Schließen</button></form></div><div class="planner-actions"><button class="plan-button" id="daily-open" type="button" aria-haspopup="dialog">Schritte &amp; Tagesziele</button></div></dialog>
+  <dialog id="account-dialog" aria-labelledby="account-dialog-title"><div class="detail-header"><h2 id="account-dialog-title">Dein Konto</h2><form method="dialog"><button class="plan-button" type="submit">Schließen</button></form></div><div class="planner-actions"><button class="plan-button" id="daily-open" type="button" aria-haspopup="dialog">Schritte &amp; Tagesziele</button><a href="#social" class="plan-button" id="social-account-link">Social-Einstellungen</a></div></dialog>
+  <dialog id="social-friend-dialog" aria-labelledby="social-friend-title">
+    <div class="detail-header"><h2 id="social-friend-title"></h2><form method="dialog"><button class="plan-button" type="submit" autofocus>Schließen</button></form></div>
+    <p id="social-friend-week" class="planner-note"></p>
+    <p id="social-friend-status" class="planner-note" role="status"></p>
+    <dl id="social-friend-stats" class="strength-totals social-stats"></dl>
+    <section aria-labelledby="social-friend-shares-title"><h3 id="social-friend-shares-title">Mit dir geteilte Trainings</h3><ul id="social-friend-shares" class="entry-list"></ul><p id="social-friend-shares-empty" class="planner-note"></p></section>
+  </dialog>
+  <dialog id="social-share-dialog" aria-labelledby="social-share-title">
+    <div class="detail-header"><h2 id="social-share-title">Training teilen</h2><form method="dialog"><button class="plan-button" type="submit" autofocus>Schließen</button></form></div>
+    <form id="social-share-form">
+      <p class="eyebrow">Vorschau</p>
+      <p id="social-share-preview"></p>
+      <fieldset class="training-days"><legend>Mit wem möchtest du teilen?</legend><div id="social-recipients" class="plan-equipment-options"></div></fieldset>
+      <p id="social-share-status" class="planner-note" role="status"></p>
+      <div class="planner-actions"><button class="plan-button primary" type="submit">Jetzt teilen</button></div>
+    </form>
+  </dialog>
   <dialog id="weight-dialog" aria-labelledby="weight-title">
     <div class="detail-header"><h2 id="weight-title">Fortschritt dokumentieren</h2><form method="dialog"><button class="plan-button">Schließen</button></form></div>
     <form id="weight-form" class="library-controls">

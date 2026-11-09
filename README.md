@@ -69,6 +69,12 @@ Ohne die beiden Supabase-Einstellungen verwendet der lokale Server weiterhin Nut
 
 Mit **Lokalen Entwurf übernehmen** kopierst du nach der Anmeldung einen vorhandenen Entwurf in dein Konto. Wenn du einen Entwurf in einer direkt geöffneten `index.html` gespeichert hast, öffne sie erneut und wähle **Lokalen Entwurf exportieren**. Importiere die Datei anschließend im Konto über **Exportierten Plan übernehmen**.
 
+### Social
+
+Wende für Social einmalig `supabase/migrations/20261109000100_fitness_social.sql` in Supabase an. Die App verwendet dieselbe Anmeldung und dieselben Supabase-Einstellungen wie für Trainingspläne. Der SQL Editor im Dashboard kann die Migration direkt ausführen. Bei einem späteren Wechsel zur CLI markiere eine bereits im SQL Editor ausgeführte Migration als angewendet. [Supabase-Migrationsworkflow](https://supabase.com/docs/guides/deployment/database-migrations)
+
+Social startet ausgeschaltet. Nach dem Anlegen des Nutzernamens bleiben Krafttraining, Cardio und Ernährung zunächst privat. Die Wochenübersicht verwendet die aktuelle Kalenderwoche von Montag bis Sonntag und kombiniert Zusammenfassungen der angemeldeten Browser. Einzelne Trainings werden nach Auswahl der Empfänger separat freigegeben. Das Abschalten einer Kategorie entfernt ihre veröffentlichten Zusammenfassungen. Wird Krafttraining privat, werden auch die daraus geteilten Trainings zurückgezogen.
+
 ### Gemeinsamer Zugriff von Handy und PC
 
 Das Repository ist für Vercel eingerichtet. Dort liefert Vercel die Browserdateien aus und leitet die Konto- und Plananfragen an eine Node.js-Funktion weiter. Supabase speichert die Konten und Pläne.

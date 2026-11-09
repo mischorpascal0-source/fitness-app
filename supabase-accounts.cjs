@@ -171,6 +171,28 @@ function createSupabaseAccounts(baseUrl, publishableKey) {
 
   const record = ({ id, data, version }) => ({ id, plan: data, version });
 
+  async function socialRequest(request, session) {
+    const input = request.method === "GET" ? { action: "state" }
+      : request.method === "POST" ? await readJson(request) : null;
+    if (typeof input?.action !== "string" || !/^[a-z]{1,12}$/.test(input.action)) {
+      throw new CloudError(400, "Ungültige Social-Anfrage.");
+    }
+    const payload = input.payload ?? {};
+    if (typeof payload !== "object" || Array.isArray(payload) || Buffer.byteLength(JSON.stringify(payload)) > 200000) {
+      throw new CloudError(400, "Ungültige Social-Anfrage.");
+    }
+    const result = await call("/rest/v1/rpc/fitness_social", {
+      method: "POST", token: session.access_token, data: { p_action: input.action, p_payload: payload },
+    });
+    if (result.ok) return result.body;
+    const code = result.body?.code;
+    if (result.status === 401) throw new CloudError(401, "Deine Sitzung ist abgelaufen. Melde dich erneut an.");
+    if (["PGRST202", "42883"].includes(code)) throw new CloudError(503, "Die Datenbankmigration für Social fehlt in Supabase.");
+    if (/^PT(400|403|404|409)$/.test(code)) throw new CloudError(result.status, result.body.message);
+    if (/^22|^23514$/.test(code)) throw new CloudError(400, "Ungültige Social-Daten.");
+    throw new CloudError(502, "Social konnte gerade nicht geladen oder gespeichert werden.");
+  }
+
   async function handle(request, response, pathname, sendJson, origin) {
     const method = request.method;
     try {
@@ -178,7 +200,7 @@ function createSupabaseAccounts(baseUrl, publishableKey) {
         return await authenticate(request, response, sendJson, origin, pathname === "/api/register");
       }
       const id = planIdFromPath(pathname);
-      if (!id && !["/api/session", "/api/logout", "/api/plans"].includes(pathname)) {
+      if (!id && !["/api/session", "/api/logout", "/api/plans", "/api/social"].includes(pathname)) {
         return sendJson(response, 404, { error: "Seite nicht gefunden." });
       }
       const session = await getSession(request, response, origin);
@@ -197,7 +219,8 @@ function createSupabaseAccounts(baseUrl, publishableKey) {
         writeCookies(response, origin);
         return sendJson(response, 200, { user: null });
       }
-      if (!session) throw new CloudError(401, "Melde dich an, um deine Pläne zu öffnen.");
+      if (!session) throw new CloudError(401, "Melde dich an, um fortzufahren.");
+      if (pathname === "/api/social") return sendJson(response, 200, await socialRequest(request, session));
       if (method === "GET" && pathname === "/api/plans") {
         return sendJson(response, 200, { plans: await plansRequest(session, { list: true }) });
       }

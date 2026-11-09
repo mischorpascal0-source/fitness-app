@@ -27,6 +27,8 @@ const strengthDashboard = (() => {
   const restSkip = document.querySelector("#workout-rest-skip");
   const optionsDialog = document.querySelector("#strength-options-dialog");
   const historyDialog = document.querySelector("#strength-history-dialog");
+  const shareLatest = document.querySelector("#strength-share-latest");
+  let socialShare, latestCompleted;
   const activityDialog = document.querySelector("#activity-dialog");
   const catalog = new Map(exerciseCatalog.map((exercise) => [exercise.id, exercise]));
   const shortDate = new Intl.DateTimeFormat("de-DE", { day: "numeric", month: "short" });
@@ -265,6 +267,14 @@ const strengthDashboard = (() => {
       if (entry.volume) detail.textContent += " · " + new Intl.NumberFormat("de-DE").format(entry.volume) + " kg bewegt";
       copy.append(name, detail);
       row.append(copy);
+      if (socialShare) {
+        const share = node("button", "plan-button", "Teilen");
+        share.type = "button";
+        share.setAttribute("aria-label", entry.name + " teilen");
+        share.setAttribute("aria-haspopup", "dialog");
+        share.addEventListener("click", () => socialShare?.(entry.id));
+        row.append(share);
+      }
       return row;
     }));
     const trainingDays = new Set(journal.workouts.map(({ date }) => date)).size;
@@ -1086,6 +1096,8 @@ const strengthDashboard = (() => {
       const totals = workoutState.summary(journal.active);
       if (!totals.totalSets || (totals.totalSets < totals.plannedSets && !incomplete.checked)) { renderWorkout(); return; }
       if (!writeJournal(workoutState.complete(journal, id), workoutStatus)) return;
+      latestCompleted = id;
+      shareLatest.hidden = !socialShare;
       if (pendingChange()) { renderWorkout(); dialog.scrollTop = 0; document.querySelector("#workout-plan-changes-title").focus({ preventScroll: true }); }
       else { dialog.close(); status.textContent = "Training gespeichert."; }
       render();
@@ -1139,6 +1151,7 @@ const strengthDashboard = (() => {
   document.addEventListener("fitness:planchange", render);
   document.querySelector("#strength-menu").addEventListener("click", () => optionsDialog.showModal());
   document.querySelector("#strength-saved").addEventListener("click", () => historyDialog.showModal());
+  shareLatest.addEventListener("click", () => socialShare?.(latestCompleted));
   document.querySelector("#strength-add-activity").addEventListener("click", () => activityDialog.showModal());
   document.querySelector("#activity-strength").addEventListener("click", () => {
     activityDialog.close();
@@ -1223,6 +1236,14 @@ const strengthDashboard = (() => {
       render();
     },
     getTrainingDates: () => journal?.workouts.map(({ date }) => date) ?? [],
+    getSocialWorkouts: () => (journal?.workouts ?? []).map(({ id, name, date, minutes, totalSets }) =>
+      ({ id, name, date, minutes, sets: totalSets })),
+    setSocialShare(open) {
+      if (socialShare === open) return;
+      socialShare = open;
+      shareLatest.hidden = !open || !latestCompleted;
+      if (historyDialog.open) renderHistory();
+    },
     close() {
       checkinContext = null;
       finishDrag();
@@ -1235,6 +1256,8 @@ const strengthDashboard = (() => {
       shownPlan = undefined;
     },
     setAccount(id) {
+      latestCompleted = undefined;
+      shareLatest.hidden = true;
       checkinContext = null;
       actionDialog.dismissWithin(sheet);
       actionDialog.dismissWithin(dialog);

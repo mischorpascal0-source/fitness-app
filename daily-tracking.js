@@ -375,6 +375,10 @@ const dailyTracking = (() => {
       }, status);
     },
     getWeightDates: () => Object.keys(data.weights),
+    getSocialEntries: () => ({
+      nutrition: data.foods.map(({ date, meal }) => ({ id: `${date}:${mealNames.indexOf(meal)}`, date, value: 1 })),
+      cardio: data.cardio.map(({ id, date, minutes }) => ({ id, date, value: minutes })),
+    }),
     setAccount(id) {
       storageKey = id ? "fitness-app.daily.v1." + id : null;
       data = read();

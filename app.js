@@ -10,6 +10,7 @@ const strength = document.querySelector("#strength-dashboard");
 const library = document.querySelector("#exercise-library");
 const planner = document.querySelector("#training-planner");
 const statistics = document.querySelector("#statistics-view");
+const social = document.querySelector("#social-view");
 const exerciseDetail = document.querySelector("#exercise-detail");
 const links = [...document.querySelectorAll(".bottom-nav a")];
 const accountDialog = document.querySelector("#account-dialog");
@@ -122,9 +123,10 @@ function renderRoute(focusHeading = false) {
   const showLibrary = location.hash === "#uebungen";
   const showCardio = location.hash === "#cardio";
   const showMobility = location.hash === "#mobility";
+  const showSocial = location.hash === "#social";
   const navHash = isPlanner || showLibrary || showMobility ? "#krafttraining" : location.hash;
   const active = links.find((link) => link.hash === navHash) ?? links[0];
-  const isHome = active === links[0];
+  const isHome = active === links[0] && !showSocial;
   const isStrength = active.hash === "#krafttraining";
   const showStrength = isStrength && !isPlanner && !showLibrary && !showCardio && !showMobility;
   const enteringStrength = showStrength && strength.hidden;
@@ -144,11 +146,12 @@ function renderRoute(focusHeading = false) {
   cardio.hidden = !showCardio;
   nutrition.hidden = active.hash !== "#ernaehrung";
   mobility.hidden = !showMobility;
+  social.hidden = !showSocial;
   dailyTracking.render();
-  heading.textContent = isPlanner ? "Trainingsplan" : showLibrary ? "Übungsbibliothek" : showCardio ? "Cardio" : showMobility ? "Mobility" : active.dataset.title;
+  heading.textContent = showSocial ? "Social" : isPlanner ? "Trainingsplan" : showLibrary ? "Übungsbibliothek" : showCardio ? "Cardio" : showMobility ? "Mobility" : active.dataset.title;
   document.title = `${heading.textContent} · Fitness-App`;
   for (const link of links) {
-    if (link === active) link.setAttribute("aria-current", "page");
+    if (link === active && !showSocial) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
   }
   if (focusHeading) {
