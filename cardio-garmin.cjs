@@ -96,28 +96,42 @@ async function handleGarmin(request, response, origin, handleAccounts, fetcher =
       connected = true;
       keyStore.save(response, origin, accountId, null);
     }
-    const activities = await garminCall("/activitylist-service/activities/search/activities?activityType=running&start=0&limit=100&sortOrder=desc", { Authorization: "Bearer " + accessToken }, "GET", fetcher);
+    const headers = { Authorization: "Bearer " + accessToken };
+    const calendarInput = typeof body?.calendarDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.calendarDate)
+      ? new Date(body.calendarDate + "T00:00:00Z") : null;
+    const calendarDate = calendarInput?.getUTCFullYear() > 0 &&
+      calendarInput.toISOString().slice(0, 10) === body.calendarDate ? body.calendarDate : new Date().toISOString().slice(0, 10);
+    const firstDay = new Date(calendarDate + "T00:00:00Z");
+    firstDay.setUTCDate(firstDay.getUTCDate() - 6);
+    const startDate = firstDay.toISOString().slice(0, 10);
+    // Both wellness calls are optional and share the existing Garmin authentication.
+    const [activities, summary, stepDays] = await Promise.all([
+      garminCall("/activitylist-service/activities/search/activities?activityType=running&start=0&limit=100&sortOrder=desc", headers, "GET", fetcher),
+      garminCall("/usersummary-service/usersummary/daily?calendarDate=" + calendarDate, headers, "GET", fetcher).catch(() => null),
+      garminCall("/usersummary-service/stats/steps/daily/" + startDate + "/" + calendarDate, headers, "GET", fetcher).catch(() => null),
+    ]);
     if (!Array.isArray(activities)) throw new Error("Invalid activities");
-    // Wellness is optional: an unsupported device or failed request must not hide runs.
     let health = null;
-    const calendarDate = typeof body?.calendarDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.calendarDate)
-      ? body.calendarDate : new Date().toISOString().slice(0, 10);
-    try {
-      const summary = await garminCall("/usersummary-service/usersummary/daily?calendarDate=" + calendarDate, { Authorization: "Bearer " + accessToken }, "GET", fetcher);
-      if (summary?.calendarDate === calendarDate && summary.includesWellnessData === true) {
-        const bounded = (n) => metric(n) !== null && n <= 100 ? n : null;
-        const rawTime = summary.wellnessEndTimeGmt;
-        const measuredAt = typeof rawTime === "string" ? rawTime + (/Z$|[+-]\d{2}:\d{2}$/.test(rawTime) ? "" : "Z") : null;
-        health = { calendarDate, measuredAt: Number.isFinite(Date.parse(measuredAt)) ? measuredAt : null,
-          bodyBattery: bounded(summary.bodyBatteryMostRecentValue), stress: bounded(summary.averageStressLevel) };
-      }
-    } catch { /* The UI explicitly shows unavailable wellness data. */ }
+    if (summary?.calendarDate === calendarDate && summary.includesWellnessData === true) {
+      const bounded = (n) => metric(n) !== null && n <= 100 ? n : null;
+      const rawTime = summary.wellnessEndTimeGmt;
+      const measuredAt = typeof rawTime === "string" ? rawTime + (/Z$|[+-]\d{2}:\d{2}$/.test(rawTime) ? "" : "Z") : null;
+      health = { calendarDate, measuredAt: Number.isFinite(Date.parse(measuredAt)) ? measuredAt : null,
+        bodyBattery: bounded(summary.bodyBatteryMostRecentValue), stress: bounded(summary.averageStressLevel) };
+    }
+    const steps = {};
+    for (let index = 0; index < 7; index++, firstDay.setUTCDate(firstDay.getUTCDate() + 1)) {
+      const date = firstDay.toISOString().slice(0, 10);
+      const count = Array.isArray(stepDays) ? stepDays.findLast((entry) =>
+        entry?.calendarDate === date && Number.isSafeInteger(entry.totalSteps) && entry.totalSteps >= 0)?.totalSteps : undefined;
+      if (count !== undefined) steps[date] = count;
+    }
     const latest = await connection.get();
     if (latest?.revision !== record.revision) {
       return sendJson(response, 409, { connected: false, error: "Die Garmin-Verbindung wurde auf einem anderen Gerät geändert. Lade die Seite neu." });
     }
     const runs = [...new Map(activities.map(normalizeRun).filter(Boolean).map((run) => [run.id, run])).values()];
-    return sendJson(response, 200, { runs, health, syncedAt: new Date().toISOString(), limit: 100, connected: true });
+    return sendJson(response, 200, { runs, health, steps, syncedAt: new Date().toISOString(), limit: 100, connected: true });
   } catch (error) {
     // An invalid replacement must not remove a previously valid account connection.
     if (error.status === 422 && error.garminAuthentication && usingStoredKey) {

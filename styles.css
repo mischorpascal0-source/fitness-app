@@ -252,7 +252,7 @@ a.workout:hover, .exercise-card:hover, .detail-close:hover { border-color: var(-
 
 .nav-inner {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: var(--space-1);
   max-width: 42rem;
   margin-inline: auto;
@@ -1037,6 +1037,10 @@ a.plan-button { display: inline-flex; align-items: center; text-decoration: none
 .bottom-nav a svg { width: 1.125rem; height: 1.125rem; }
 .bottom-nav a[aria-current="page"] { background: var(--accent-gradient); color: #1D233D; box-shadow: inset 0 1px 0 rgb(255 255 255 / .6), 0 3px 0 #514F7D, 0 5px 12px rgb(0 0 0 / .2); }
 .bottom-nav a:focus-visible { outline-color: var(--text); outline-offset: 2px; }
+@media (max-width: 23rem) {
+  .bottom-nav { left: max(var(--space-2), env(safe-area-inset-left)); right: max(var(--space-2), env(safe-area-inset-right)); padding-inline: .25rem; }
+  .nav-inner { grid-template-columns: repeat(6, minmax(2.75rem, auto)); gap: .125rem; }
+}
 
 #home-view { display: grid; gap: var(--space-5); }
 .dashboard-label, #home-view > .training > h2 { margin: 0 0 var(--space-3); color: var(--muted); font-size: .8125rem; line-height: 1.35; font-weight: 600; letter-spacing: .015em; text-transform: none; }

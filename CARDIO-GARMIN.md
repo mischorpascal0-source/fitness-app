@@ -4,7 +4,9 @@ Diese Erweiterung nutzt ausschließlich die offizielle Garmin Connect Personal A
 
 1. In Garmin Connect unter https://connect.garmin.com/app/settings/personalApiToken einen Personal API Key erstellen.
 2. In der Fitness-App anmelden, **Cardio → Garmin verbinden** öffnen und den Schlüssel eingeben.
-3. **Schlüssel speichern & Läufe laden** lädt bis zu 100 letzte Laufaktivitäten einschließlich Lauf-Untertypen. **Jetzt synchronisieren** aktualisiert diese Auswahl. Es gibt keine automatische Hintergrundsynchronisierung.
+3. **Schlüssel speichern & Läufe laden** lädt bis zu 100 letzte Laufaktivitäten einschließlich Lauf-Untertypen und die täglichen Schrittwerte der letzten sieben Tage. Aktualisiere die Daten über **Jetzt synchronisieren** oder über **Garmin synchronisieren** in der Schritte-Kachel auf Home.
+
+Home zeigt den heutigen Garmin-Wert mit Quellenhinweis. Die Schritte-Statistik verwendet je Tag den Garmin-Wert, sofern verfügbar, sonst den manuellen Eintrag. Das persönliche Schrittziel bleibt separat einstellbar. Garmin-Schritte werden wie die Läufe pro Konto im Browser zwischengespeichert. [Garmin Personal API](https://developer.garmin.com/gc-developer-program/personal/swagger-docs/)
 
 Angezeigt werden Distanz, Dauer, Pace, durchschnittliche Herzfrequenz, Höhenmeter und Kalorien, soweit Garmin diese liefert. Zeitraumfilter: 30 Tage, 90 Tage oder alle geladenen Läufe. Die Gesamtpace wird aus Distanz und Dauer der Läufe mit beiden Messwerten berechnet. Garmin-Läufe stehen separat neben den manuellen Cardio-Einträgen und verändern deren Wochenstatistik nicht.
 
@@ -20,7 +22,7 @@ Vor dem Deployment die Migration `supabase/migrations/20261108000100_fitness_gar
 
 Im lokalen SQLite-Modus wird die Verbindung verschlüsselt in derselben Kontodatenbank gespeichert. Ohne konfigurierten Verschlüsselungsschlüssel wird lokal `.data/garmin-cookie.key` verwendet. Wenn lokale Entwicklung und Vercel dasselbe Supabase-Projekt verwenden, müssen sie denselben `FITNESS_GARMIN_COOKIE_KEY` verwenden, damit beide dieselben Kontoverbindungen entschlüsseln können. Für unabhängige Entwicklungsumgebungen ein eigenes Supabase-Projekt verwenden.
 
-Fehlerbehebung: Garmins Token-Endpunkt antwortet mit JWT-Text, nicht JSON. Daher verwendet die App dort `Accept: */*` und liest Text, wie Garmins offizieller Python-Client. Nur Laufdaten werden als JSON gelesen. Upstream-Fehler zeigen Phase und HTTP-Status; Logs enthalten keine Schlüssel, Tokens oder Antwortinhalte.
+Fehlerbehebung: Garmins Token-Endpunkt antwortet mit JWT-Text, nicht JSON. Daher verwendet die App dort `Accept: */*` und liest Text, wie Garmins offizieller Python-Client. Lauf-, Erholungs- und Schrittwerte werden als JSON gelesen. Upstream-Fehler zeigen Phase und HTTP-Status. Logs enthalten keine Schlüssel, Tokens oder Antwortinhalte.
 
 Die neuen Dateien `cardio-garmin.js`, `cardio-garmin.css` und `cardio-garmin.cjs` kapseln die Erweiterung. Gemeinsame Dateien enthalten nur Einbindung, Konto-Lifecycle, Routing und die Asset-Freigabe. Bei paralleler Arbeit nur diese kleinen Integrationsstellen übernehmen, keine kompletten gemeinsamen Dateien ersetzen.
 

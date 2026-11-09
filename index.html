@@ -106,7 +106,7 @@
           <button class="card metric habit-card habit-steps" id="steps" type="button" aria-haspopup="dialog" aria-label="Schritte und Tagesziele bearbeiten">
             <span class="habit-icon" aria-hidden="true"><svg><use href="#icon-steps"/></svg></span>
             <h3 id="steps-label">Schritte</h3>
-            <span class="habit-period">Heute</span>
+            <span class="habit-period" id="steps-source">Heute</span>
             <progress aria-labelledby="steps-label"></progress>
             <p class="goal"></p>
             <div class="habit-footer"><span class="value"></span><svg aria-hidden="true"><use href="#icon-arrow"/></svg></div>
@@ -140,7 +140,7 @@
         <h2 class="dashboard-label" id="home-improve-title">Für deine Balance</h2>
         <a class="card shortcut" href="#mobility"><span><strong>Deine Mobility-Routine</strong><small>Ein paar Minuten für deine Beweglichkeit.</small></span><svg class="mobility-accent" aria-hidden="true"><use href="#icon-mobility"/></svg></a>
       </section>
-      <a class="card shortcut" href="#social"><span><strong>Social</strong><small>Freunde, Wochenstatistiken und geteilte Trainings</small></span><svg aria-hidden="true"><use href="#icon-social"/></svg></a>
+      <a class="card shortcut" href="#social"><span><strong>Freunde</strong><small>Wochenstatistiken und geteilte Trainings</small></span><svg aria-hidden="true"><use href="#icon-social"/></svg></a>
     </div>
     <section id="strength-dashboard" hidden>
       <section class="card library-panel calendar-panel" aria-label="Trainingskalender">
@@ -208,7 +208,7 @@
         <section class="card library-panel"><h2>Deine Makronährstoffe</h2><p class="planner-note">Durchschnitt pro Tag · Letzte 7 Tage</p><div id="stats-macros" class="macro-grid"></div></section>
       </div>
       <div id="stats-cardio" role="tabpanel" aria-labelledby="stats-cardio-tab" hidden>
-        <section class="card library-panel"><div class="section-heading"><h2>Schritte</h2><span id="stats-steps-average" class="stat-current"></span></div><p class="planner-note">Letzte 7 Tage · Tagesdurchschnitt</p><div id="stats-steps-chart" class="activity-chart steps-chart"></div></section>
+        <section class="card library-panel"><div class="section-heading"><h2>Schritte</h2><span id="stats-steps-average" class="stat-current"></span></div><p class="planner-note">Letzte 7 Tage · Durchschnitt der erfassten Tage</p><div id="stats-steps-chart" class="activity-chart steps-chart"></div></section>
         <section class="card library-panel"><h2>Ausdauer</h2><p class="planner-note">Letzte 7 Tage</p><dl class="strength-totals"><div><dt>Aktive Minuten</dt><dd id="stats-cardio-minutes">0</dd></div><div><dt>Kilometer</dt><dd id="stats-cardio-distance">0</dd></div></dl><a class="text-link" href="#cardio">Cardio öffnen</a></section>
       </div>
     </section>
@@ -407,7 +407,7 @@
       </aside>
       <div id="plan-result" tabindex="-1"></div>
     </section>
-    <section id="social-view" aria-label="Social" hidden>
+    <section id="social-view" aria-label="Freunde" hidden>
       <section class="card library-panel" aria-labelledby="social-settings-title">
         <h2 id="social-settings-title">Deine Social-Einstellungen</h2>
         <p class="planner-note">Du entscheidest, welche Statistiken deine bestätigten Freunde sehen.</p>
@@ -458,6 +458,7 @@
       <a href="#cardio" data-title="Cardio"><svg aria-hidden="true"><use href="#icon-cardio"/></svg>Cardio</a>
       <a href="#ernaehrung" data-title="Ernährung"><svg aria-hidden="true"><use href="#icon-nutrition"/></svg>Ernährung</a>
       <a href="#statistiken" data-title="Statistiken"><svg aria-hidden="true"><use href="#icon-stats"/></svg>Statistiken</a>
+      <a href="#social" data-title="Freunde"><svg aria-hidden="true"><use href="#icon-social"/></svg>Freunde</a>
     </div>
   </nav>
   <dialog id="exercise-detail" aria-labelledby="exercise-detail-title">
@@ -576,6 +577,8 @@
       <label>Schritte heute <input name="steps" type="number" min="0" max="100000" required></label>
       <label>Schrittziel <input name="stepGoal" type="number" min="1" max="100000" required></label>
       <label>Kalorienziel in kcal <input name="calorieGoal" type="number" min="1" max="20000" required></label>
+      <p id="steps-garmin-status" class="planner-note" role="status"></p>
+      <button class="plan-button" id="steps-garmin-sync" type="button" hidden>Garmin synchronisieren</button>
       <p class="planner-note">Deine Ziele bestimmst du selbst. Die gegessenen Kalorien ergeben sich aus deinem Ernährungstagebuch.</p>
       <button class="plan-button primary" type="submit">Speichern</button>
       <p class="planner-note form-status" role="status"></p>

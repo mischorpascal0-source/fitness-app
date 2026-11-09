@@ -126,7 +126,7 @@ function renderRoute(focusHeading = false) {
   const showSocial = location.hash === "#social";
   const navHash = isPlanner || showLibrary || showMobility ? "#krafttraining" : location.hash;
   const active = links.find((link) => link.hash === navHash) ?? links[0];
-  const isHome = active === links[0] && !showSocial;
+  const isHome = active === links[0];
   const isStrength = active.hash === "#krafttraining";
   const showStrength = isStrength && !isPlanner && !showLibrary && !showCardio && !showMobility;
   const enteringStrength = showStrength && strength.hidden;
@@ -148,10 +148,10 @@ function renderRoute(focusHeading = false) {
   mobility.hidden = !showMobility;
   social.hidden = !showSocial;
   dailyTracking.render();
-  heading.textContent = showSocial ? "Social" : isPlanner ? "Trainingsplan" : showLibrary ? "Übungsbibliothek" : showCardio ? "Cardio" : showMobility ? "Mobility" : active.dataset.title;
+  heading.textContent = isPlanner ? "Trainingsplan" : showLibrary ? "Übungsbibliothek" : showCardio ? "Cardio" : showMobility ? "Mobility" : active.dataset.title;
   document.title = `${heading.textContent} · Fitness-App`;
   for (const link of links) {
-    if (link === active && !showSocial) link.setAttribute("aria-current", "page");
+    if (link === active) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
   }
   if (focusHeading) {

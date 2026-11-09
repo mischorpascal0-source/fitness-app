@@ -3,6 +3,10 @@ const dailyTracking = (() => {
   const mealNames = ["Frühstück", "Mittagessen", "Abendessen", "Snacks"];
   const nutritionDate = document.querySelector("#nutrition-date");
   const dailyForm = document.querySelector("#daily-form");
+  const stepField = dailyForm.elements.steps;
+  const stepsSource = document.querySelector("#steps-source");
+  const stepsSync = document.querySelector("#steps-garmin-sync");
+  const stepsStatus = document.querySelector("#steps-garmin-status");
   const foodForm = document.querySelector("#food-form");
   const cardioForm = document.querySelector("#cardio-form");
   const weightForm = document.querySelector("#weight-form");
@@ -77,12 +81,13 @@ const dailyTracking = (() => {
     document.querySelector(selector).replaceChildren(...values.map((value, index) => {
       const bar = document.createElement("div");
       const count = document.createElement("small");
-      count.textContent = format.format(value);
+      count.textContent = value == null ? "–" : format.format(value);
       const column = document.createElement("span");
       column.style.setProperty("--bar-height", value / max * 100 + "%");
+      if (value == null) column.style.visibility = "hidden";
       const label = document.createElement("small");
       label.textContent = trainingPlanData.weekdays[(new Date(dates[index] + "T12:00:00").getDay() + 6) % 7].slice(0, 2);
-      bar.setAttribute("aria-label", dates[index] + ", " + format.format(value));
+      bar.setAttribute("aria-label", dates[index] + ", " + (value == null ? "kein Wert erfasst" : format.format(value)));
       bar.append(count, column, label);
       return bar;
     }));
@@ -107,9 +112,7 @@ const dailyTracking = (() => {
     const foods = data.foods.filter(({ date }) => dates.includes(date));
     const calories = dates.map((date) => totals(foods.filter((entry) => entry.date === date)).calories);
     document.querySelector("#stats-calories-average").textContent = "Ø " + format.format(totals(foods).calories / 7) + " kcal";
-    document.querySelector("#stats-steps-average").textContent = "Ø " + format.format(dates.reduce((sum, date) => sum + (data.steps[date] ?? 0), 0) / 7);
     renderBars("#stats-calories-chart", dates, calories);
-    renderBars("#stats-steps-chart", dates, dates.map((date) => data.steps[date] ?? 0));
     renderMacros("#stats-macros", totals(foods), 7);
     const cardio = data.cardio.filter(({ date }) => dates.includes(date));
     document.querySelector("#stats-cardio-minutes").textContent = format.format(cardio.reduce((sum, entry) => sum + entry.minutes, 0));
@@ -150,10 +153,36 @@ const dailyTracking = (() => {
 
   function renderMetric(id, value, goal, unit) {
     const card = document.getElementById(id);
-    card.querySelector(".value").textContent = format.format(value) + unit;
+    card.querySelector(".value").textContent = value == null ? "–" : format.format(value) + unit;
     card.querySelector(".goal").textContent = "Ziel " + format.format(goal) + unit;
     card.querySelector("progress").max = goal;
-    card.querySelector("progress").value = value;
+    card.querySelector("progress").value = value ?? 0;
+  }
+
+  function renderSteps() {
+    const garmin = cardioGarmin.getSnapshot();
+    const imported = garmin.connected ? garmin.steps : undefined;
+    const day = today();
+    const current = imported?.[day];
+    const hasGarmin = current !== undefined;
+    renderMetric("steps", current ?? data.steps[day] ?? null, data.goals.steps, "");
+    stepsSource.textContent = hasGarmin ? "Heute · Garmin" : "Heute";
+    stepsSync.hidden = !garmin.connected;
+    stepsSync.disabled = garmin.busy;
+    stepsStatus.textContent = garmin.busy ? "Garmin wird geladen …"
+      : hasGarmin ? "Der heutige Schrittwert stammt von Garmin."
+      : garmin.connected ? "Für heute liegt noch kein Garmin-Wert vor. Du kannst Schritte manuell eintragen."
+      : "Du kannst Schritte manuell eintragen oder Garmin unter Cardio verbinden.";
+    if (hasGarmin) stepField.value = current;
+    else if (stepField.disabled) stepField.value = data.steps[day] ?? 0;
+    stepField.disabled = hasGarmin;
+
+    const dates = recentDates(7);
+    const values = dates.map((date) => imported?.[date] ?? data.steps[date] ?? null);
+    const tracked = values.filter((value) => value != null);
+    document.querySelector("#stats-steps-average").textContent = tracked.length
+      ? "Ø " + format.format(tracked.reduce((sum, value) => sum + value, 0) / tracked.length) : "–";
+    renderBars("#stats-steps-chart", dates, values);
   }
 
   function entryRow(name, detail, onRemove) {
@@ -272,7 +301,7 @@ const dailyTracking = (() => {
     if (nutritionDate.value === lastToday && lastToday !== today()) nutritionDate.value = today();
     lastToday = today();
     if (!nutritionDate.value) nutritionDate.value = today();
-    renderMetric("steps", data.steps[today()] ?? 0, data.goals.steps, "");
+    renderSteps();
     renderMetric("calories", totals(data.foods.filter(({ date }) => date === today())).calories, data.goals.calories, " kcal");
     const homeRing = document.querySelector("#home-calorie-ring");
     homeRing.style.setProperty("--calorie-progress", Math.min(100, totals(data.foods.filter(({ date }) => date === today())).calories / data.goals.calories * 100) + "%");
@@ -293,9 +322,17 @@ const dailyTracking = (() => {
   }
 
   openForm("#daily-open", "#daily-dialog", dailyForm, () => {
-    dailyForm.elements.steps.value = data.steps[today()] ?? 0;
+    stepField.value = data.steps[today()] ?? 0;
     dailyForm.elements.stepGoal.value = data.goals.steps;
     dailyForm.elements.calorieGoal.value = data.goals.calories;
+    renderSteps();
+  });
+  document.addEventListener("fitness:garminchange", renderSteps);
+  stepsSync.addEventListener("click", async () => {
+    const status = dailyForm.querySelector(".form-status");
+    status.textContent = "";
+    await cardioGarmin.sync();
+    if (cardioGarmin.getSnapshot().error) status.textContent = "Garmin konnte nicht synchronisiert werden. Versuche es erneut.";
   });
   document.querySelector("#steps").addEventListener("click", () => document.querySelector("#daily-open").click());
   openForm("#weight-open", "#weight-dialog", weightForm, () => {
@@ -315,7 +352,7 @@ const dailyTracking = (() => {
     event.preventDefault();
     if (!dailyForm.reportValidity()) return;
     if (commit((next) => {
-      next.steps[today()] = dailyForm.elements.steps.valueAsNumber;
+      if (!stepField.disabled) next.steps[today()] = stepField.valueAsNumber;
       next.goals.steps = dailyForm.elements.stepGoal.valueAsNumber;
       next.goals.calories = dailyForm.elements.calorieGoal.valueAsNumber;
     }, dailyForm.querySelector(".form-status"))) document.querySelector("#daily-dialog").close();

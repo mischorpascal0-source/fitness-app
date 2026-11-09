@@ -314,4 +314,28 @@ test("optional wellness failure preserves synchronized runs", async () => {
   assert.equal(res.status, 200);
   assert.equal(res.body.runs.length, 1);
   assert.equal(res.body.health, null);
+  assert.deepEqual(res.body.steps, {});
+});
+
+test("loads and validates Garmin daily steps for the last seven calendar days", async () => {
+  const res = response();
+  let stepsRequest;
+  await handleGarmin(request({ apiKey: "personal-key", calendarDate: "2026-11-03" }), res, "http://localhost:3000", account, async (url, options) => {
+    if (!url.includes("/stats/steps/daily/")) return garminSuccess();
+    stepsRequest = { url, authorization: options.headers.Authorization };
+    return { ok: true, json: async () => [
+      { calendarDate: "2026-10-27", totalSteps: 9000 },
+      { calendarDate: "2026-10-28", totalSteps: 4800 },
+      { calendarDate: "2026-10-31", totalSteps: -1 },
+      { calendarDate: "2026-11-01", totalSteps: null },
+      { calendarDate: "2026-11-02", totalSteps: 0 },
+      { calendarDate: "2026-11-03", totalSteps: 6420, stepGoal: 8500, totalDistance: 3500 },
+      { calendarDate: "2026-11-03", totalSteps: 6421 },
+      { calendarDate: "2026-11-04", totalSteps: 12 },
+    ] };
+  });
+  assert.match(stepsRequest.url, /\/stats\/steps\/daily\/2026-10-28\/2026-11-03$/);
+  assert.match(stepsRequest.authorization, /^Bearer /);
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body.steps, { "2026-10-28": 4800, "2026-11-02": 0, "2026-11-03": 6421 });
 });

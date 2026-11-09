@@ -14,6 +14,8 @@ const cardioGarmin = (() => {
   let syncError = false;
   const cacheKey = () => "fitness-app.cardio.garmin.v1." + accountId;
   const valid = (value) => typeof value === "number" && Number.isFinite(value) && value >= 0;
+  const readSteps = (value) => Object.fromEntries(Object.entries(value ?? {}).filter(([date, count]) =>
+    /^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isSafeInteger(count) && count >= 0));
   const distance = (meters) => valid(meters) ? number.format(meters / 1000) + " km" : "–";
   function duration(seconds) {
     if (!valid(seconds)) return "–";
@@ -103,7 +105,7 @@ const cardioGarmin = (() => {
     controller = new AbortController();
     const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(25000)]);
     syncError = false;
-    status.textContent = "Laufdaten werden von Garmin geladen …";
+    status.textContent = "Läufe und Schritte werden von Garmin geladen …";
     render();
     try {
       const response = await fetch("/api/garmin", {
@@ -118,11 +120,12 @@ const cardioGarmin = (() => {
         throw new Error(result?.error ?? "Garmin konnte nicht verbunden werden.");
       }
       if (!Array.isArray(result?.runs) || !Number.isFinite(Date.parse(result.syncedAt))) throw new Error("Ungültige Antwort beim Laden der Laufdaten.");
-      saved = { runs: result.runs, syncedAt: result.syncedAt, health: result.health ?? null };
+      saved = { runs: result.runs, syncedAt: result.syncedAt, health: result.health ?? null, steps: readSteps(result.steps) };
       connected = true;
       keyInput.value = "";
       find("setup").open = false;
-      status.textContent = `${saved.runs.length} Läufe geladen. Deine Laufdaten sind aktuell.`;
+      status.textContent = `${saved.runs.length} Läufe geladen.` +
+        (Object.keys(saved.steps).length ? " Garmin-Schritte aktualisiert." : " Garmin hat keine Schrittwerte geliefert.");
       try { localStorage.setItem(cacheKey(), JSON.stringify(saved)); }
       catch { status.textContent += " Der Browser konnte sie nicht dauerhaft speichern."; }
     } catch (error) {
@@ -176,6 +179,7 @@ const cardioGarmin = (() => {
   });
   return {
     getSnapshot: () => ({ ...saved, connected, busy: Boolean(controller), error: syncError }),
+    sync,
     setAccount(id) {
       revision++;
       controller?.abort();
@@ -189,7 +193,7 @@ const cardioGarmin = (() => {
         try {
           const cached = JSON.parse(localStorage.getItem(cacheKey()));
           if (Array.isArray(cached?.runs) && Number.isFinite(Date.parse(cached.syncedAt))) {
-            saved = { health: cached.health ?? null, syncedAt: cached.syncedAt, runs: cached.runs.filter((run) =>
+            saved = { health: cached.health ?? null, syncedAt: cached.syncedAt, steps: readSteps(cached.steps), runs: cached.runs.filter((run) =>
               /^\d+$/.test(run?.id) && typeof run.name === "string" && typeof run.start === "string" && Number.isFinite(Date.parse(run.start)) &&
               [run.distance, run.duration, run.averageHR, run.maxHR, run.elevationGain, run.calories].every((value) => value === null || valid(value))) };
           }
