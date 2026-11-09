@@ -6,14 +6,15 @@ const snapshot=(battery, stress, age=0)=>({connected:true,health:{bodyBattery:ba
 test('all sports work without Garmin, with at most three honest general suggestions',()=>{
  for(const sport of Object.keys(sports)) {
   const result=suggest(sport,{},now);
-  assert.equal(result.suggestions.length,3);
+  assert.equal(result.suggestions.length,2);
   for(const unit of result.suggestions){ assert.equal(unit.sport,sport); assert.equal(unit.source,'Allgemeiner Vorschlag'); assert.ok(unit.steps.length); assert.ok(unit.reason); }
  }
 });
 test('low recovery prioritizes rest and removes demanding HIIT for every suggestion',()=>{
  for(const data of [snapshot(15,10),snapshot(80,90)]){
   const result=suggest('hiit',data,now);
-  assert.equal(result.suggestions[0].rest,true);
+  assert.equal(result.restRecommended,true);
+  assert.ok(result.suggestions.every(unit=>!unit.rest));
   assert.ok(!result.suggestions.some(u=>u.id==='intervals'));
   assert.ok(result.suggestions.every(u=>u.minutes<=10));
   assert.equal(result.suggestions[0].source,'Basierend auf deinen Garmin-Daten');
@@ -36,4 +37,13 @@ test('a long recent run also reduces cross-sport load; failed sync is explained'
  const data={...snapshot(90,10),error:true,runs:[{start:new Date(now-3600000).toISOString(),duration:4000}]};
  assert.ok(suggest('cycling',data,now).suggestions[0].minutes<25);
  assert.match(suggest('cycling',data,now).note,/nicht aktualisiert/);
+});
+
+test('rest advice uses only current low recovery values, not missing or moderately low data',()=>{
+ assert.equal(suggest('running', snapshot(43,26), now).restRecommended,false);
+ assert.equal(suggest('running', snapshot(15,90,7*3600000), now).restRecommended,false);
+ assert.equal(suggest('running', {}, now).restRecommended,false);
+ const result=suggest('running', snapshot(15,26), now);
+ assert.match(result.summary,/Body Battery 15/);
+ assert.ok(!result.suggestions.some(unit=>unit.title==='Heute regenerieren'));
 });

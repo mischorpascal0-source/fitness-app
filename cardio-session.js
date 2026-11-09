@@ -10,21 +10,24 @@ const cardioSession = (() => {
     try { if (session) localStorage.setItem(storageKey(), JSON.stringify(session)); else localStorage.removeItem(storageKey()); }
     catch { status.textContent = 'Der Timer läuft, konnte aber nicht für ein Neuladen gespeichert werden.'; }
   }
-  function proposals() { return cardioSuggestions.suggest(sport, cardioGarmin.getSnapshot()); }
+  function proposals() { return cardioSuggestions.suggest(sport || 'running', cardioGarmin.getSnapshot()); }
   function renderSuggestions() {
-    if (!sport || selected) return;
+    if (selected) return;
     const result = proposals();
-    const signature = JSON.stringify(result);
+    const signature = JSON.stringify([sport, result]);
     if (signature === suggestionSignature) return;
     suggestionSignature = signature;
-    find('data-note').textContent = result.note;
+    find('rest-notice').hidden = !result.restRecommended;
+    find('rest-notice').textContent = result.restRecommended ? 'Heute ist ein Ruhetag empfohlen. Priorisiere Erholung; falls du dich bewegen möchtest, bleib bei einer sehr leichten Einheit.' : '';
+    find('data-note').textContent = result.summary + ' ' + result.note;
+    if (!sport) { find('suggestions').replaceChildren(); return; }
     find('suggestions').replaceChildren(...result.suggestions.map(unit => {
       const card = node('article', undefined, 'cardio-suggestion');
       const button = node('button', 'Einheit auswählen', 'plan-button'); button.type = 'button';
       button.addEventListener('click', () => { selected = unit; done = false; status.textContent = ''; render(); find('selected').focus(); });
       const list = node('ol'); unit.steps.forEach(step => list.append(node('li', step)));
       if (unit.source === 'Allgemeiner Vorschlag') card.append(node('small', unit.source, 'eyebrow'));
-      card.append(node('h3', unit.title), node('p', `${unit.rest ? 'Ruhetag' : unit.minutes + ' Min.'} · ${unit.intensity}`), list, node('p', unit.reason, 'planner-note'), button);
+      card.append(node('h3', unit.title), node('p', `${unit.rest ? 'Ruhetag' : unit.minutes + ' Min.'} · ${unit.intensity}`), list, button);
       return card;
     }));
   }
@@ -48,7 +51,6 @@ const cardioSession = (() => {
       find('selected-title').textContent = selected.title;
       find('selected-meta').textContent = `${selected.source === 'Allgemeiner Vorschlag' ? selected.source + ' · ' : ''}${selected.rest ? 'Ruhetag' : selected.minutes + ' Min.'} · ${selected.intensity}`;
       find('selected-steps').replaceChildren(...selected.steps.map(step => node('li', step)));
-      find('selected-reason').textContent = selected.reason;
       find('timer').hidden = selected.rest;
       find('training-back').textContent = done ? 'Neue Einheit' : 'Andere Einheit';
       if (selected.rest) find('phase').textContent = 'Heute ist kein Training nötig. Ein Ruhetag wird nicht als absolvierte Aktivität gespeichert.';

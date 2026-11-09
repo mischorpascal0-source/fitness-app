@@ -47,7 +47,9 @@
 .cardio-timer { font-size: 2.5rem; font-variant-numeric: tabular-nums; margin-block: 1rem; }
 #cardio-selected { margin-top: 1rem; }
 #cardio-selected .planner-actions { display: flex; flex-wrap: wrap; }
-@media (min-width: 1000px) { .cardio-suggestions { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1000px) { .cardio-suggestions { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 /* Recovery cards share the app's dark palette. */
 #garmin-recommendation { background: var(--surface); color: var(--text); border-color: var(--accent-blue); }
 #garmin-recommendation[data-level="high"], #garmin-recommendation[data-level="moderate"] { background: var(--raised); border-color: var(--accent-warm); }
+
+#cardio-rest-notice { border-left: 4px solid var(--accent-warm); padding: 1rem; border-radius: var(--radius-control); background: var(--raised); color: var(--text); }

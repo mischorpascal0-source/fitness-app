@@ -249,6 +249,7 @@
         <p class="planner-note">Wähle deine Sportart. Wir finden eine Einheit, die zu deiner Energie passt.</p>
         <button id="cardio-start" class="plan-button primary" type="button" aria-expanded="false" aria-controls="cardio-chooser">Cardio starten</button>
         <div id="cardio-chooser" hidden>
+          <p id="cardio-rest-notice" class="planner-note cardio-rest-notice" role="status" hidden></p>
           <div id="cardio-sports" class="planner-actions" role="group" aria-label="Sportart wählen"></div>
           <p id="cardio-data-note" class="planner-note" role="status"></p>
           <p class="planner-note">Eigene App-Empfehlungen. Garmin-Trainingsvorschläge, Schlaf, Training Readiness und Erholungszeit werden über die bestehende Anbindung nicht importiert. Ohne passende Aktivitätsdaten starten die Vorschläge mit einer leichten Einheit.</p>
@@ -256,7 +257,7 @@
         </div>
         <section id="cardio-selected" hidden aria-labelledby="cardio-selected-title" tabindex="-1">
           <h3 id="cardio-selected-title"></h3><p id="cardio-selected-meta"></p>
-          <ol id="cardio-selected-steps"></ol><p id="cardio-selected-reason" class="planner-note"></p>
+          <ol id="cardio-selected-steps"></ol>
           <p id="cardio-timer" class="cardio-timer" aria-label="Aktive Trainingszeit">00:00</p>
           <p id="cardio-phase" class="planner-note" role="status"></p>
           <div class="planner-actions"><button id="cardio-training-start" class="plan-button primary" type="button">Training starten</button><button id="cardio-training-pause" class="plan-button" type="button" hidden>Pause</button><button id="cardio-training-end" class="plan-button" type="button" hidden>Beenden &amp; speichern</button><button id="cardio-training-back" class="plan-button" type="button">Andere Einheit</button></div>
