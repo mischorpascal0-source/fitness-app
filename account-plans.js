@@ -133,6 +133,7 @@
     strengthDashboard.setAccount(account?.id);
     dailyTracking.setAccount(account?.id);
     cardioGarmin.setAccount(account?.id);
+    cardioSession.setAccount(account?.id);
     trainingPlanner.setWorkspace(workspace, null);
     renderPlanSelect();
     if (account) {

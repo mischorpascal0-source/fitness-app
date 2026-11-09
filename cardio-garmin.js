@@ -11,6 +11,7 @@ const cardioGarmin = (() => {
   let saved = { runs: [], syncedAt: null };
   let controller = null;
   let revision = 0;
+  let syncError = false;
   const cacheKey = () => "fitness-app.cardio.garmin.v1." + accountId;
   const valid = (value) => typeof value === "number" && Number.isFinite(value) && value >= 0;
   const distance = (meters) => valid(meters) ? number.format(meters / 1000) + " km" : "–";
@@ -92,6 +93,7 @@ const cardioGarmin = (() => {
         : "Verbinde Garmin, um deine Laufdaten zu laden.";
     find("updated").textContent = saved.syncedAt ? "Zuletzt geladen: " + dateFormat.format(new Date(saved.syncedAt)) + " · Bis zu 100 letzte Läufe · Auf diesem Gerät gespeichert" : "";
     root.setAttribute("aria-busy", String(busy));
+    if (typeof document.dispatchEvent === "function") document.dispatchEvent(new Event("fitness:garminchange"));
   }
   async function sync(key) {
     if (controller || !accountId) return;
@@ -100,6 +102,7 @@ const cardioGarmin = (() => {
     const currentAccount = accountId;
     controller = new AbortController();
     const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(25000)]);
+    syncError = false;
     status.textContent = "Laufdaten werden von Garmin geladen …";
     render();
     try {
@@ -124,6 +127,7 @@ const cardioGarmin = (() => {
       catch { status.textContent += " Der Browser konnte sie nicht dauerhaft speichern."; }
     } catch (error) {
       if (currentRevision !== revision) return;
+      syncError = true;
       status.textContent = error.name === "TimeoutError" ? "Die Anfrage dauert zu lange. Versuche es erneut." : error.message || "Verbindung fehlgeschlagen. Versuche es erneut.";
     } finally {
       if (currentRevision === revision) { controller = null; render(); }
@@ -171,11 +175,13 @@ const cardioGarmin = (() => {
     render();
   });
   return {
+    getSnapshot: () => ({ ...saved, connected, busy: Boolean(controller), error: syncError }),
     setAccount(id) {
       revision++;
       controller?.abort();
       controller = null;
       accountId = id ?? null;
+      syncError = false;
       connected = false;
       keyInput.value = "";
       saved = { runs: [], syncedAt: null };
@@ -200,7 +206,7 @@ const cardioGarmin = (() => {
         fetch("/api/garmin", { headers: { "X-Fitness-Account": accountId }, signal: AbortSignal.any([controller.signal, AbortSignal.timeout(25000)]) })
           .then((response) => { if (!response.ok) throw new Error("Die gespeicherte Garmin-Verbindung konnte nicht geprüft werden."); return response.json(); })
           .then((result) => { if (version === revision) { connected = result.connected === true; find("setup").open = !connected; status.textContent = ""; } })
-          .catch((error) => { if (version === revision) status.textContent = error.message; })
+          .catch((error) => { if (version === revision) { syncError = true; status.textContent = error.message; } })
           .finally(() => { if (version === revision) { controller = null; render(); } });
       }
     },

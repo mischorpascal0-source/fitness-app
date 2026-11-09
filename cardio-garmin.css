@@ -31,3 +31,23 @@
 #garmin-recommendation { border-left: 4px solid #67887b; padding: .5rem 1rem; background: #edf4ef; border-radius: .4rem; }
 #garmin-recommendation[data-level="high"], #garmin-recommendation[data-level="moderate"] { border-color: #af7426; background: #fff5e4; }
 #garmin-recommendation h4 { margin-top: .5rem; }
+
+.cardio-start-card { background: var(--surface-gradient); }
+.cardio-start-card > .primary { width: 100%; margin-block: .5rem; }
+#cardio-chooser { margin-top: 1.25rem; }
+#cardio-chooser select { display: block; width: 100%; padding: .75rem; margin-top: .5rem; border-radius: var(--radius-control); }
+#cardio-sports { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+#cardio-sports [aria-pressed="true"] { background: var(--accent-gradient); color: var(--background); }
+.cardio-suggestions { display: grid; gap: 1rem; margin-top: 1rem; }
+.cardio-suggestion { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 1rem; min-width: 0; }
+.cardio-suggestion h3 { margin-block: .75rem .5rem; }
+.cardio-suggestion ol, #cardio-selected-steps { padding-left: 1.3rem; line-height: 1.6; }
+.cardio-suggestion .eyebrow { font-size: .7rem; overflow-wrap: anywhere; }
+.cardio-suggestion button { width: 100%; }
+.cardio-timer { font-size: 2.5rem; font-variant-numeric: tabular-nums; margin-block: 1rem; }
+#cardio-selected { margin-top: 1rem; }
+#cardio-selected .planner-actions { display: flex; flex-wrap: wrap; }
+@media (min-width: 1000px) { .cardio-suggestions { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+/* Recovery cards share the app's dark palette. */
+#garmin-recommendation { background: var(--surface); color: var(--text); border-color: var(--accent-blue); }
+#garmin-recommendation[data-level="high"], #garmin-recommendation[data-level="moderate"] { background: var(--raised); border-color: var(--accent-warm); }
