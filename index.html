@@ -21,6 +21,8 @@
   <script src="workout-state.js" defer></script>
   <script src="strength-dashboard.js" defer></script>
   <script src="daily-tracking.js" defer></script>
+  <script src="cardio-suggestions.js" defer></script>
+  <script src="cardio-session.js" defer></script>
   <script src="app.js" defer></script>
   <script src="account-plans.js" defer></script>
 </head>
@@ -241,6 +243,28 @@
       <p id="nutrition-status" class="planner-note" role="status"></p>
     </section>
     <section id="cardio-view" hidden>
+      <section class="card library-panel cardio-start-card" aria-labelledby="cardio-start-title">
+        <span class="eyebrow">Dein Training heute</span>
+        <h2 id="cardio-start-title">Was passt heute zu dir?</h2>
+        <p class="planner-note">Wähle deine Sportart. Wir finden eine Einheit, die zu deiner Energie passt.</p>
+        <button id="cardio-start" class="plan-button primary" type="button" aria-expanded="false" aria-controls="cardio-chooser">Cardio starten</button>
+        <div id="cardio-chooser" hidden>
+          <div id="cardio-sports" class="planner-actions" role="group" aria-label="Sportart wählen"></div>
+          <label>Deine Erfahrung in dieser Sportart<select id="cardio-experience"><option value="new">Einstieg / unsicher</option><option value="regular">Regelmäßig aktiv</option></select></label>
+          <p id="cardio-data-note" class="planner-note" role="status"></p>
+          <p class="planner-note">Eigene App-Empfehlungen. Garmin-Trainingsvorschläge, Schlaf, Training Readiness und Erholungszeit werden über die bestehende Anbindung nicht importiert. Bei Radfahren, HIIT und Sonstiges ist deine gewählte Erfahrung maßgeblich; Laufdaten belegen dort keinen Leistungsstand.</p>
+          <div id="cardio-suggestions" class="cardio-suggestions"></div>
+        </div>
+        <section id="cardio-selected" hidden aria-labelledby="cardio-selected-title" tabindex="-1">
+          <h3 id="cardio-selected-title"></h3><p id="cardio-selected-meta"></p>
+          <ol id="cardio-selected-steps"></ol><p id="cardio-selected-reason" class="planner-note"></p>
+          <p id="cardio-timer" class="cardio-timer" aria-label="Aktive Trainingszeit">00:00</p>
+          <p id="cardio-phase" class="planner-note" role="status"></p>
+          <div class="planner-actions"><button id="cardio-training-start" class="plan-button primary" type="button">Training starten</button><button id="cardio-training-pause" class="plan-button" type="button" hidden>Pause</button><button id="cardio-training-end" class="plan-button" type="button" hidden>Beenden &amp; speichern</button><button id="cardio-training-back" class="plan-button" type="button">Andere Einheit</button></div>
+          <p class="planner-note">Timer in der App · startet keine Garmin-Uhr. Nur aktive Zeit wird gespeichert, ohne GPS-Distanz.</p>
+        </section>
+        <p id="cardio-session-status" class="planner-note" role="status" aria-live="polite"></p>
+      </section>
       <section id="garmin-cardio" class="card library-panel" aria-labelledby="garmin-heading">
         <div class="section-heading"><span class="eyebrow">Dein Lauftraining</span><span id="garmin-state" class="garmin-badge">Nicht verbunden</span></div>
         <h2 id="garmin-heading">Deine Läufe. Im Überblick.</h2>

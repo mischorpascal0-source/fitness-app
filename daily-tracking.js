@@ -368,6 +368,12 @@ const dailyTracking = (() => {
 
   return {
     render,
+    recordCardio(entry, status) {
+      if (!storageKey) { status.textContent = "Zum Speichern bitte anmelden."; return false; }
+      return commit(next => {
+        if (!next.cardio.some(item => item.id === entry.id)) next.cardio.push(entry);
+      }, status);
+    },
     getWeightDates: () => Object.keys(data.weights),
     setAccount(id) {
       storageKey = id ? "fitness-app.daily.v1." + id : null;
