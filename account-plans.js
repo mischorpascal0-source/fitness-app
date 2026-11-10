@@ -110,8 +110,8 @@
 
   async function selectPlan(id) {
     selected = id ? await api(`/api/plans/${id}`) : null;
-    trainingPlanner.setWorkspace(workspace, selected?.plan);
     renderPlanSelect();
+    trainingPlanner.setWorkspace(workspace, selected?.plan);
   }
 
   async function setAccount(next, focus = true) {

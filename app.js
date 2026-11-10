@@ -103,17 +103,36 @@ function renderToday() {
 
 function renderScheduledTraining(now = new Date()) {
   const weekday = (now.getDay() + 6) % 7;
-  const sessions = trainingPlanner.getPlan()?.sessions.filter((session) => session.weekday === weekday) ?? [];
+  const plan = trainingPlanner.getPlan()?.sessions ?? [];
+  const scheduled = plan.filter((session) => Number.isInteger(session.weekday));
+  const sessions = scheduled.filter((session) => session.weekday === weekday);
   const container = document.querySelector("#training-card");
-  if (!sessions.length) {
-    container.replaceChildren(document.querySelector("#rest-template").content.cloneNode(true));
+  if (scheduled.length && !sessions.length) {
+    const card = document.querySelector("#rest-template").content.firstElementChild.cloneNode(true);
+    const next = trainingPlanData.weekdays.slice(1).map((_, index) => (weekday + index + 1) % 7)
+      .find((day) => scheduled.some((session) => session.weekday === day));
+    if (next !== undefined) {
+      const names = scheduled.filter((session) => session.weekday === next).map(({ name }) => name).join(" · ");
+      card.querySelector("p").textContent = `Als Nächstes am ${trainingPlanData.weekdays[next]} · ${names}`;
+    }
+    container.replaceChildren(card);
     return;
   }
 
   const card = document.querySelector("#training-template").content.firstElementChild.cloneNode(true);
-  card.href = "#krafttraining";
-  card.querySelector("h3").textContent = sessions.map(({ name }) => name).join(" · ");
-  card.querySelector("p").textContent = "Zum Krafttraining";
+  if (sessions.length) {
+    const exercises = sessions.flatMap((session) => session.exercises);
+    const minutes = trainingPlanData.estimateMinutes(exercises.reduce((sum, entry) => sum + entry.sets, 0));
+    card.querySelector("h3").textContent = sessions.map(({ name }) => name).join(" · ");
+    card.querySelector("p").textContent = exercises.length
+      ? `${exercises.length} ${exercises.length === 1 ? "Übung" : "Übungen"} · ca. ${minutes} Min.`
+      : "Übungen im Trainingsplan ergänzen";
+  } else {
+    card.href = "#trainingsplan";
+    card.querySelector("h3").textContent = plan.length ? "Trainingstage festlegen" : "Dein erster Trainingsplan";
+    card.querySelector("p").textContent = plan.length ? "Ordne deinen Einheiten feste Wochentage zu." : "Lege deine Trainingstage und Übungen fest.";
+    card.querySelector(".home-session-action span").textContent = "Trainingsplan öffnen";
+  }
   container.replaceChildren(card);
 }
 

@@ -63,9 +63,11 @@ const weekCalendar = (() => {
           const name = document.createElement("small");
           name.textContent = trainingPlanData.weekdays[index].slice(0, 2);
           const number = document.createElement("strong");
-          number.textContent = isCompleted && key !== selectedKey ? "✓" : day.getDate();
+          number.textContent = day.getDate();
           const dot = document.createElement("span");
           dot.className = "calendar-dot";
+          dot.setAttribute("aria-hidden", "true");
+          if (isCompleted) dot.innerHTML = '<svg><use href="#icon-check"/></svg>';
           button.append(name, number, dot);
           button.addEventListener("click", () => onSelect(day));
           return button;

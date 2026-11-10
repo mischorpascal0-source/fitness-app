@@ -234,9 +234,11 @@ const dailyTracking = (() => {
     document.querySelector("#nutrition-eaten").textContent = format.format(sum.calories) + " kcal";
     document.querySelector("#nutrition-goal").textContent = format.format(data.goals.calories) + " kcal";
     document.querySelector("#nutrition-remaining").textContent = format.format(Math.abs(remaining));
-    const ring = document.querySelector("#nutrition-ring");
-    ring.querySelector("small").textContent = remaining < 0 ? "kcal über Ziel" : "kcal übrig";
-    ring.style.setProperty("--calorie-progress", Math.min(100, sum.calories / data.goals.calories * 100) + "%");
+    document.querySelector("#nutrition-summary-date").textContent = weekFormat.format(nutritionDate);
+    document.querySelector("#nutrition-balance-label").textContent = remaining < 0 ? "kcal über Ziel" : "kcal übrig";
+    const progress = document.querySelector("#nutrition-progress");
+    progress.max = data.goals.calories;
+    progress.value = sum.calories;
     renderMacros("#nutrition-macros", sum);
     document.querySelector("#nutrition-meals").replaceChildren(...mealNames.map((meal, index) => {
       const items = entries.filter((entry) => entry.meal === meal);
@@ -362,8 +364,6 @@ const dailyTracking = (() => {
     lastToday = today();
     renderSteps();
     renderMetric("calories", totals(data.foods.filter(({ date }) => date === today())).calories, data.goals.calories, " kcal");
-    const homeRing = document.querySelector("#home-calorie-ring");
-    homeRing.style.setProperty("--calorie-progress", Math.min(100, totals(data.foods.filter(({ date }) => date === today())).calories / data.goals.calories * 100) + "%");
     renderNutrition();
     renderCardio();
     renderMobility();
@@ -460,13 +460,14 @@ const dailyTracking = (() => {
     showFoodResult(false);
   }
 
-  function openFoodForm(meal) {
-    foodOpener = meal ? "meal-open-" + mealNames.indexOf(meal) : "food-open";
-    prepareFoodForm(meal, keyForDate(nutritionDate));
+  function openFoodForm(meal, opener, date = keyForDate(nutritionDate)) {
+    foodOpener = opener ?? (meal ? "meal-open-" + mealNames.indexOf(meal) : "food-open");
+    prepareFoodForm(meal, date);
     showNutritionDialog(foodDialog);
   }
 
   document.querySelector("#food-open").addEventListener("click", () => openFoodForm());
+  document.querySelector("#home-food-open").addEventListener("click", () => openFoodForm(null, "home-food-open", today()));
   foodAddMore.addEventListener("click", () => {
     if (!savedMeal) return;
     prepareFoodForm(savedMeal.meal, savedMeal.date);
@@ -540,7 +541,7 @@ const dailyTracking = (() => {
     mealCopySource.max = keyForDate(previous);
     mealCopySource.value = mealCopySource.max;
     document.querySelector("#meal-copy-title").textContent = meal + " übernehmen";
-    document.querySelector("#meal-copy-target").textContent = "Eintragen für den " + nutritionDateLabel(mealCopy.target);
+    document.querySelector("#meal-copy-target").textContent = nutritionDateLabel(mealCopy.target);
     renderMealCopy();
     showNutritionDialog(mealCopyDialog);
   }

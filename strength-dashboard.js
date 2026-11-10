@@ -448,7 +448,7 @@ const strengthDashboard = (() => {
   function renderGuidance(exercise) {
     const suggestion = exercise.guidance || trainingGuidance.suggest({ ...catalog.get(exercise.id), ...exercise }, journal.workouts, journal.active.checkin, Date.now(), journal);
     const panel = node("section", "workout-guidance"); panel.setAttribute("aria-label", "Persönlicher Trainingsvorschlag");
-    panel.append(node("span", "eyebrow", "Dein Trainingsvorschlag"));
+    panel.append(node("h3", "", "Trainingsvorschlag"));
     if (suggestion.last) panel.append(node("p", "planner-note", "Letztes vergleichbares Training: " + guidancePair(suggestion.last, suggestion.profile)));
     if (suggestion.test) panel.append(node("p", "planner-note", "Krafttest: " + guidancePair(suggestion.test, suggestion.profile)));
     if (suggestion.last || suggestion.test) panel.append(node("p", "guidance-baseline", "Basis: " + guidancePair(suggestion.baseline, suggestion.profile)));
@@ -561,9 +561,10 @@ const strengthDashboard = (() => {
       const action = exercise.skipped ? "Übung wieder aufnehmen" : state === "Abgeschlossen" ? "Sätze bearbeiten" : exercise.started ? "Übung fortsetzen" : "Übung ansehen";
       open.setAttribute("aria-label", `${action}: ${exercise.name}, ${count} von ${exercise.done.length} Sätzen erledigt`);
       const copy = node("span", "workout-list-copy");
-      copy.append(node("small", "workout-item-state", `${index + 1}. Übung · ${state}`), node("strong", "", exercise.name),
+      const progressText = `${exercise.skipped ? "Übersprungen · " : ""}${count} von ${exercise.done.length} Sätzen erledigt`;
+      copy.append(node("strong", "", exercise.name),
         node("small", "", `${exercise.equipment || catalog.get(exercise.id)?.type || "Eigene Übung"} · ${exercise.done.length} × ${exercise.reps} Wdh.`),
-        node("span", "workout-row-progress", `${count} von ${exercise.done.length} Sätzen erledigt`));
+        node("span", "workout-row-progress", progressText));
       if (exercise.started || exercise.skipped) copy.append(node("span", "workout-row-action", action + " ›"));
       open.append(imageFor(exercise), copy);
       open.addEventListener("click", () => openExercise(exercise.instanceId));
@@ -780,10 +781,21 @@ const strengthDashboard = (() => {
 
   function renderSets(exercise) {
     const fieldset = node("fieldset", "workout-sets"); fieldset.disabled = journal.active.pausedAt != null || exercise.skipped;
-    fieldset.append(node("legend", "", "Tatsächlich absolviert"), node("p", "planner-note", trainingGuidance.weightLabel({ ...catalog.get(exercise.id), ...exercise }) + ". Vorgeschlagene Werte vor dem Abhaken prüfen."));
+    const nextSet = node("p", "workout-next-set"); nextSet.setAttribute("role", "status");
+    fieldset.append(node("legend", "", "Tatsächlich absolviert"), nextSet,
+      node("p", "planner-note", trainingGuidance.weightLabel({ ...catalog.get(exercise.id), ...exercise }) + ". Vorgeschlagene Werte vor dem Abhaken prüfen."));
     const boxes = node("div", "workout-set-grid"), labels = node("div", "workout-set-labels");
     for (const text of ["Satz", "kg", "Wdh.", "Fertig"]) labels.append(node("span", "", text));
     boxes.append(labels);
+    function showNextSet(entry) {
+      const index = entry.done.indexOf(false);
+      const text = entry.skipped ? "Übung übersprungen" : index < 0 ? "Alle Sätze erfasst" : `Satz ${index + 1} von ${entry.done.length}`;
+      if (nextSet.textContent !== text) nextSet.textContent = text;
+      boxes.querySelectorAll(".workout-set-row").forEach((row, set) => {
+        row.classList.toggle("is-next", !entry.skipped && set === index);
+        row.classList.toggle("is-recorded", entry.done[set]);
+      });
+    }
     exercise.done.forEach((checked, set) => {
       const row = node("div", "workout-set-row"); row.append(node("span", "", set + 1));
       for (const [field, label, min, max, step] of [["weights", "Gewicht in kg", 0, 2000, "any"], ["setReps", "Wiederholungen", 1, 1000, "1"]]) {
@@ -798,7 +810,7 @@ const strengthDashboard = (() => {
           if (field === "setReps") entry.touchedReps[set] = true;
           else entry.touchedWeights[set] = true;
           if (!input.validity.valid) { entry.done[set] = false; row.querySelector('[type="checkbox"]').checked = false; }
-          if (saveActive(next)) updateWorkoutProgress();
+          if (saveActive(next)) { updateWorkoutProgress(); showNextSet(entry); }
         });
         row.append(input);
       }
@@ -815,12 +827,12 @@ const strengthDashboard = (() => {
           entry.setContexts[set] = { ...workoutState.contextFor({ ...catalog.get(entry.id), ...entry }), kind: entry.setTypes[set], proposal: entry.acceptedSuggestions[set] };
           entry.acceptedSuggestions[set] = null;
         }
-        if (saveActive(next)) updateWorkoutProgress(); else box.checked = checked;
+        if (saveActive(next)) { updateWorkoutProgress(); showNextSet(entry); } else box.checked = checked;
       });
       row.append(box);
       const kindLabel = node("label", "workout-set-kind"), warmup = node("input"); warmup.type = "checkbox"; warmup.checked = exercise.setTypes[set] === "warmup";
       warmup.setAttribute("aria-label", `Satz ${set + 1} als Aufwärmsatz markieren`);
-      kindLabel.append(warmup, "Aufwärmsatz · nicht für Gewichtsvorschläge");
+      kindLabel.append(warmup, "Aufwärmsatz");
       warmup.addEventListener("change", () => {
         if (!currentExercise()) return;
         const next = structuredClone(journal.active), entry = next.exercises.find(({ instanceId }) => instanceId === exercise.instanceId);
@@ -831,7 +843,8 @@ const strengthDashboard = (() => {
       });
       row.append(kindLabel); boxes.append(row);
     });
-    fieldset.append(boxes); return fieldset;
+    showNextSet(exercise);
+    fieldset.append(boxes, node("p", "workout-set-note", "Gewichtsvorschläge berücksichtigen Arbeitssätze.")); return fieldset;
   }
 
   function renderExercise() {
@@ -860,22 +873,21 @@ const strengthDashboard = (() => {
       cancel.addEventListener("click", () => { candidate = null; sheetView = "replace"; renderExercise(); });
       const actions = node("div", "planner-actions"); actions.append(confirm, cancel); sheetContent.append(actions); renderTimers(); return;
     }
-    const source = catalog.get(exercise.id), hero = node("div", "workout-exercise-hero"), copy = node("div");
-    copy.append(node("p", "planner-note", exercise.equipment || source?.type || "Eigene Übung"), node("p", "workout-prescription", `Vorgabe: ${exercise.done.length} × ${exercise.reps} Wiederholungen`));
-    hero.append(imageFor(exercise, true), copy); sheetContent.append(hero);
-    sheetContent.append(renderGuidance(exercise));
-    if (source?.steps?.length) {
-      const details = node("details", "workout-instructions"), steps = node("ol"); details.id = "workout-technique";
-      details.append(node("summary", "", "Ausführung ansehen"), node("p", "", source.gear));
-      steps.append(...source.steps.map((text) => node("li", "", text))); details.append(steps); sheetContent.append(details);
-    }
+    const source = catalog.get(exercise.id);
+    const prescription = node("p", "workout-prescription", `Vorgabe: ${exercise.done.length} × ${exercise.reps} Wiederholungen`);
+    const discouraged = ["pain", "strong"].includes(exercise.guidance?.recovery.level);
+    const guidance = renderGuidance(exercise);
     if (sheetView === "sets") {
+      sheetContent.append(prescription);
+      if (discouraged) sheetContent.append(guidance);
       sheetContent.append(renderSets(exercise));
-      const targets = node("details", "workout-instructions"); targets.id = "workout-targets-details"; targets.append(node("summary", "", "Wiederholungsbereich und Satzvorgaben anpassen"), renderTargets(exercise)); sheetContent.append(targets);
-      const done = node("button", "plan-button primary workout-return", "Zur Trainingsübersicht"); done.type = "button"; done.id = "workout-exercise-done";
+      const done = node("button", "plan-button workout-return", "Zur Trainingsübersicht"); done.type = "button"; done.id = "workout-exercise-done";
       done.addEventListener("click", closeExercise); sheetContent.append(done);
     } else {
-      const discouraged = ["pain", "strong"].includes(exercise.guidance?.recovery.level);
+      const hero = node("div", "workout-exercise-hero"), copy = node("div");
+      copy.append(node("p", "planner-note", exercise.equipment || source?.type || "Eigene Übung"), prescription);
+      hero.append(imageFor(exercise, true), copy); sheetContent.append(hero);
+      if (discouraged) sheetContent.append(guidance);
       const startExercise = node("button", "plan-button primary workout-return", discouraged ? "Bereits absolvierte Sätze dokumentieren" : exercise.skipped ? "Übung wieder aufnehmen" : exercise.started ? "Übung fortsetzen" : "Übung starten");
       startExercise.type = "button"; startExercise.id = "workout-exercise-start"; startExercise.disabled = journal.active.pausedAt != null;
       startExercise.addEventListener("click", () => {
@@ -885,8 +897,14 @@ const strengthDashboard = (() => {
         if (saveActive(next)) { sheetView = "sets"; renderWorkout(); renderExercise(); sheet.scrollTop = 0; }
       });
       sheetContent.append(startExercise);
-      const targets = node("details", "workout-instructions"); targets.id = "workout-targets-details"; targets.append(node("summary", "", "Wiederholungsbereich und Satzvorgaben anpassen"), renderTargets(exercise)); sheetContent.append(targets);
     }
+    if (!discouraged) sheetContent.append(guidance);
+    if (source?.steps?.length) {
+      const details = node("details", "workout-instructions"), steps = node("ol"); details.id = "workout-technique";
+      details.append(node("summary", "", "Ausführung ansehen"), node("p", "", source.gear));
+      steps.append(...source.steps.map((text) => node("li", "", text))); details.append(steps); sheetContent.append(details);
+    }
+    const targets = node("details", "workout-instructions"); targets.id = "workout-targets-details"; targets.append(node("summary", "", "Wiederholungsbereich und Satzvorgaben anpassen"), renderTargets(exercise)); sheetContent.append(targets);
     const swap = node("button", "plan-button", "Übung austauschen"); swap.type = "button"; swap.id = "workout-swap";
     swap.addEventListener("click", openReplacement);
     const skip = node("button", "text-button", exercise.skipped ? "Übung wieder aufnehmen" : exercise.done.some(Boolean) ? "Offene Sätze überspringen" : "Übung überspringen");
@@ -1179,6 +1197,10 @@ const strengthDashboard = (() => {
   }
   window.visualViewport?.addEventListener("resize", syncWorkoutViewport);
   window.visualViewport?.addEventListener("scroll", syncWorkoutViewport);
+  if (typeof ResizeObserver === "function") {
+    const toolbar = sheet.querySelector(".workout-exercise-toolbar");
+    new ResizeObserver(() => sheet.style.setProperty("--workout-toolbar-height", `${toolbar.offsetHeight}px`)).observe(toolbar);
+  }
   syncWorkoutViewport();
   window.setInterval(renderTimers, 1000);
   window.addEventListener("storage", (event) => {

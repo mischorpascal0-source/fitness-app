@@ -93,62 +93,65 @@
       <div class="header-actions"><span class="header-streak" id="app-streak" title="Trainingstage in Folge"><svg aria-hidden="true"><use href="#icon-flame"/></svg><strong id="app-streak-count">0</strong></span><button class="icon-button" id="profile-open" type="button" aria-label="Konto und gespeicherte Pläne" aria-haspopup="dialog"><svg aria-hidden="true"><use href="#icon-settings"/></svg></button></div>
     </header>
     <div id="home-view">
-      <section class="home-week-section" aria-labelledby="home-welcome">
-        <h2 class="dashboard-label" id="home-welcome">Willkommen zurück</h2>
+      <div class="home-today">
+        <section class="home-training" aria-labelledby="training-title">
+          <h2 class="dashboard-label" id="training-title">Heutiges Training</h2>
+          <div id="training-card"></div>
+        </section>
+        <section class="home-overview" aria-labelledby="overview-title">
+          <h2 class="dashboard-label" id="overview-title">Tagesfortschritt</h2>
+          <div class="home-metrics">
+            <button class="card habit-card" id="steps" type="button" aria-haspopup="dialog" aria-label="Schritte und Tagesziele bearbeiten" aria-describedby="steps-value steps-goal">
+              <span class="habit-label"><svg aria-hidden="true"><use href="#icon-steps"/></svg><span id="steps-label">Schritte</span></span>
+              <strong class="value" id="steps-value"></strong>
+              <progress aria-labelledby="steps-label"></progress>
+              <span class="habit-caption"><span id="steps-source">Heute</span><span class="goal" id="steps-goal"></span></span>
+            </button>
+            <button class="card habit-card" id="calories" type="button" aria-label="Ernährungstagebuch öffnen" aria-describedby="calories-value calories-goal">
+              <span class="habit-label"><svg aria-hidden="true"><use href="#icon-nutrition"/></svg><span id="calories-label">Kalorien</span></span>
+              <strong class="value" id="calories-value"></strong>
+              <progress aria-labelledby="calories-label"></progress>
+              <span class="habit-caption"><span>Gegessen</span><span class="goal" id="calories-goal"></span></span>
+            </button>
+          </div>
+        </section>
+      </div>
+      <section class="home-logging" aria-labelledby="home-logging-title">
+        <h2 class="dashboard-label" id="home-logging-title">Schnell eintragen</h2>
+        <div class="home-action-list">
+          <button class="plan-button" id="home-food-open" type="button" aria-haspopup="dialog"><svg aria-hidden="true"><use href="#icon-nutrition"/></svg>Essen eintragen</button>
+          <button class="plan-button" id="weight-open" type="button" aria-haspopup="dialog"><svg aria-hidden="true"><use href="#icon-weight"/></svg>Gewicht eintragen</button>
+        </div>
+      </section>
+      <section class="home-week-section" aria-labelledby="home-week-title">
+        <h2 class="dashboard-label" id="home-week-title">Deine Trainingswoche</h2>
         <div class="card home-week-card">
-          <h3>Deine Trainingswoche</h3>
-          <div class="week-goal-labels"><span id="home-week-start"></span><span id="home-week-caption">Dein Wochenziel</span><span id="home-week-end"></span></div>
+          <div class="week-goal-labels"><strong id="home-week-caption">Dein Wochenziel</strong><span><span id="home-week-start"></span> – <span id="home-week-end"></span></span></div>
           <progress id="home-week-progress" aria-label="Abgeschlossene Trainings im Wochenziel" value="0" max="1"></progress>
-          <button class="home-progress-button" id="weight-open" type="button" aria-haspopup="dialog"><svg aria-hidden="true"><use href="#icon-weight"/></svg>Fortschritt dokumentieren</button>
+          <div class="home-history">
+            <button class="habit-card" id="home-weight-open" type="button" aria-haspopup="dialog">
+              <span class="habit-label"><svg aria-hidden="true"><use href="#icon-weight"/></svg>Gewicht</span>
+              <span class="habit-caption"><strong id="home-weighins">0/7</strong> diese Woche</span>
+              <span id="home-weight-heatmap" class="habit-heatmap" aria-hidden="true"></span>
+              <small class="planner-note">Letzte 30 Tage</small>
+            </button>
+            <a class="habit-card" href="#krafttraining">
+              <span class="habit-label"><svg aria-hidden="true"><use href="#icon-strength"/></svg>Trainings</span>
+              <span class="habit-caption"><strong id="home-training-goal">0/0</strong> diese Woche</span>
+              <span id="home-training-heatmap" class="habit-heatmap" aria-hidden="true"></span>
+              <small class="planner-note">Letzte 30 Tage</small>
+            </a>
+          </div>
         </div>
       </section>
-      <section class="home-overview" aria-labelledby="overview-title">
-        <div class="section-heading">
-          <h2 class="dashboard-label" id="overview-title">Dein Überblick</h2>
-        </div>
-        <div class="metrics habit-grid">
-          <button class="card metric habit-card habit-steps" id="steps" type="button" aria-haspopup="dialog" aria-label="Schritte und Tagesziele bearbeiten">
-            <span class="habit-icon" aria-hidden="true"><svg><use href="#icon-steps"/></svg></span>
-            <h3 id="steps-label">Schritte</h3>
-            <span class="habit-period" id="steps-source">Heute</span>
-            <progress aria-labelledby="steps-label"></progress>
-            <p class="goal"></p>
-            <div class="habit-footer"><span class="value"></span><svg aria-hidden="true"><use href="#icon-arrow"/></svg></div>
-          </button>
-          <button class="card metric habit-card habit-calories" id="calories" type="button" aria-label="Ernährungstagebuch öffnen">
-            <span class="habit-icon" aria-hidden="true"><svg><use href="#icon-nutrition"/></svg></span>
-            <h3 id="calories-label">Kalorien</h3>
-            <span class="habit-period">Heute gegessen</span>
-            <div id="home-calorie-ring" class="habit-ring"><span><strong class="value"></strong><small class="goal"></small></span></div>
-            <progress class="sr-only" aria-labelledby="calories-label"></progress>
-          </button>
-          <button class="card habit-card" id="home-weight-open" type="button" aria-haspopup="dialog">
-            <span class="habit-icon" aria-hidden="true"><svg><use href="#icon-weight"/></svg></span>
-            <h3>Gewicht</h3><span class="habit-period">Letzte 30 Tage</span>
-            <div id="home-weight-heatmap" class="habit-heatmap" aria-hidden="true"></div>
-            <div class="habit-footer"><span><strong id="home-weighins">0/7</strong><small> diese Woche</small></span><svg aria-hidden="true"><use href="#icon-arrow"/></svg></div>
-          </button>
-          <a class="card habit-card habit-trainings" href="#krafttraining">
-            <span class="habit-icon" aria-hidden="true"><svg><use href="#icon-strength"/></svg></span>
-            <h3>Trainings</h3><span class="habit-period">Letzte 30 Tage</span>
-            <div id="home-training-heatmap" class="habit-heatmap" aria-hidden="true"></div>
-            <div class="habit-footer"><span><strong id="home-training-goal">0/0</strong><small> diese Woche</small></span><svg aria-hidden="true"><use href="#icon-arrow"/></svg></div>
-          </a>
-        </div>
-      </section>
-      <section class="training" aria-labelledby="training-title">
-        <h2 id="training-title">Heutiges Training</h2>
-        <div id="training-card"></div>
-      </section>
-      <section class="home-improve" aria-labelledby="home-improve-title">
-        <h2 class="dashboard-label" id="home-improve-title">Für deine Balance</h2>
-        <a class="card shortcut" href="#mobility"><span><strong>Deine Mobility-Routine</strong><small>Ein paar Minuten für deine Beweglichkeit.</small></span><svg class="mobility-accent" aria-hidden="true"><use href="#icon-mobility"/></svg></a>
-      </section>
-      <a class="card shortcut" href="#social"><span><strong>Freunde</strong><small>Wochenstatistiken und geteilte Trainings</small></span><svg aria-hidden="true"><use href="#icon-social"/></svg></a>
+      <div class="home-links">
+        <a class="card shortcut" href="#mobility"><svg aria-hidden="true"><use href="#icon-mobility"/></svg><span><strong>Deine Mobility-Routine</strong><small>Ein paar Minuten für deine Beweglichkeit.</small></span><svg aria-hidden="true"><use href="#icon-arrow"/></svg></a>
+        <a class="card shortcut" href="#social"><svg aria-hidden="true"><use href="#icon-social"/></svg><span><strong>Freunde</strong><small>Wochenstatistiken und geteilte Trainings</small></span><svg aria-hidden="true"><use href="#icon-arrow"/></svg></a>
+      </div>
     </div>
     <section id="strength-dashboard" hidden>
       <section class="card library-panel calendar-panel" aria-label="Trainingskalender">
-        <div class="section-heading"><span id="calendar-selected-date" data-calendar-selected></span><div class="calendar-actions"><button id="calendar-prev" class="icon-button" type="button" aria-label="Vorherige Woche" data-calendar-prev>‹</button><span id="calendar-month" class="calendar-month"></span><button id="calendar-next" class="icon-button" type="button" aria-label="Nächste Woche" data-calendar-next>›</button></div></div>
+        <div class="section-heading"><span id="calendar-selected-date" data-calendar-selected></span><div class="calendar-actions"><button id="calendar-prev" class="icon-button" type="button" aria-label="Vorherige Woche" data-calendar-prev><svg aria-hidden="true"><use href="#icon-arrow"/></svg></button><span id="calendar-month" class="calendar-month"></span><button id="calendar-next" class="icon-button" type="button" aria-label="Nächste Woche" data-calendar-next><svg aria-hidden="true"><use href="#icon-arrow"/></svg></button></div></div>
         <div id="strength-calendar" class="week-calendar"></div>
         <div class="calendar-footer"><a class="text-link" href="#trainingsplan">Wöchentliche Trainingstage ändern</a><button id="calendar-today" class="text-button" type="button" data-calendar-today>Heute</button></div>
       </section>
@@ -157,9 +160,9 @@
         <div class="session-card-heading"><span class="session-icon"><svg aria-hidden="true"><use href="#icon-strength"/></svg></span><h2 id="strength-today">Krafttraining</h2><button id="strength-menu" class="card-menu-button" type="button" aria-label="Trainingseinheit auswählen und anpassen" aria-haspopup="dialog">⋮</button></div>
         <p class="planner-note" id="strength-session-date"></p>
         <div class="session-facts" id="strength-session-facts"></div>
+        <button class="plan-button primary" id="strength-start" type="button" aria-haspopup="dialog" hidden>Training starten</button>
         <p class="session-muscles" id="strength-session-muscles"></p>
         <ul id="strength-session-preview" class="session-preview-strip"></ul>
-        <button class="plan-button primary" id="strength-start" type="button" aria-haspopup="dialog" hidden>Training starten</button>
       </section>
       <section class="card library-panel empty-training-day" id="strength-empty-day" aria-labelledby="strength-empty-title" hidden>
         <span class="session-icon"><svg aria-hidden="true"><use href="#icon-rest"/></svg></span>
@@ -246,15 +249,24 @@
       <div class="activity-options"><button class="card action-row" id="activity-strength" type="button"><svg aria-hidden="true"><use href="#icon-strength"/></svg>Krafttraining</button><a class="card action-row" href="#cardio"><svg aria-hidden="true"><use href="#icon-cardio"/></svg>Cardio</a><a class="card action-row" href="#mobility"><svg aria-hidden="true"><use href="#icon-mobility"/></svg>Mobility</a></div>
     </dialog>
     <section id="nutrition-view" hidden>
-      <section id="nutrition-calendar" class="card library-panel calendar-panel diary-calendar-panel" aria-label="Ernährungskalender"></section>
-      <h2>Dein Ernährungstagebuch</h2>
-      <section class="card library-panel">
-        <div class="calorie-overview"><div class="calorie-ring" id="nutrition-ring"><span><strong id="nutrition-remaining">0</strong><small>kcal übrig</small></span></div><div class="calorie-detail"><span>Gegessen</span><strong id="nutrition-eaten">0 kcal</strong><span>Tagesziel</span><strong id="nutrition-goal">2.200 kcal</strong></div></div>
+      <section class="card library-panel nutrition-summary" aria-labelledby="nutrition-title">
+        <div class="section-heading">
+          <div><h2 id="nutrition-title">Tagesbilanz</h2><p class="planner-note" id="nutrition-summary-date"></p></div>
+          <button class="plan-button primary" id="food-open" type="button" aria-haspopup="dialog"><svg aria-hidden="true"><use href="#icon-plus"/></svg>Eintragen</button>
+        </div>
+        <div class="calorie-overview">
+          <div class="calorie-balance"><strong id="nutrition-remaining">0</strong> <span id="nutrition-balance-label">kcal übrig</span></div>
+          <div class="calorie-detail"><strong id="nutrition-eaten">0 kcal</strong> von <span id="nutrition-goal">2.200 kcal</span></div>
+        </div>
+        <progress id="nutrition-progress" aria-label="Gegessene Kalorien im Tagesziel" value="0" max="2200"></progress>
         <div class="macro-grid" id="nutrition-macros"></div>
       </section>
-      <div class="section-heading"><h2>Deine Mahlzeiten</h2><button class="plan-button primary" id="food-open" type="button" aria-haspopup="dialog">+ Eintragen</button></div>
-      <div id="nutrition-meals" class="meal-list"></div>
-      <p id="nutrition-status" class="planner-note" role="status"></p>
+      <section id="nutrition-calendar" class="card library-panel calendar-panel diary-calendar-panel" aria-label="Ernährungskalender"></section>
+      <section class="meal-overview" aria-labelledby="nutrition-meals-title">
+        <h2 id="nutrition-meals-title">Deine Mahlzeiten</h2>
+        <div id="nutrition-meals" class="meal-list"></div>
+        <p id="nutrition-status" class="planner-note" role="status"></p>
+      </section>
     </section>
     <section id="cardio-view" hidden>
       <section id="cardio-calendar" class="card library-panel calendar-panel diary-calendar-panel" aria-label="Cardiokalender"></section>
@@ -265,8 +277,7 @@
         <p id="cardio-status" class="planner-note" role="status"></p>
       </section>
       <section class="card library-panel cardio-start-card" aria-labelledby="cardio-start-title">
-        <span class="eyebrow">Dein Training heute</span>
-        <h2 id="cardio-start-title">Was passt heute zu dir?</h2>
+        <h2 id="cardio-start-title">Passende Einheit finden</h2>
         <p class="planner-note">Wähle deine Sportart. Wir finden eine Einheit, die zu deiner Energie passt.</p>
         <button id="cardio-start" class="plan-button primary" type="button" aria-expanded="false" aria-controls="cardio-chooser">Cardio starten</button>
         <div id="cardio-chooser" hidden>
@@ -287,8 +298,7 @@
         <p id="cardio-session-status" class="planner-note" role="status" aria-live="polite"></p>
       </section>
       <section id="garmin-cardio" class="card library-panel" aria-labelledby="garmin-heading">
-        <div class="section-heading"><span class="eyebrow">Dein Lauftraining</span><span id="garmin-state" class="garmin-badge">Nicht verbunden</span></div>
-        <h2 id="garmin-heading">Deine Läufe. Im Überblick.</h2>
+        <div class="section-heading"><h2 id="garmin-heading">Garmin Connect</h2><span id="garmin-state" class="garmin-badge">Nicht verbunden</span></div>
         <p class="planner-note">Verbinde Garmin Connect und hole deine letzten 100 Läufe direkt in dein Trainingstagebuch.</p>
         <details id="garmin-setup" open>
           <summary>Garmin verbinden</summary>
@@ -305,7 +315,6 @@
         </div>
         <p id="garmin-status" class="planner-note" role="status" aria-live="polite"></p>
         <section class="garmin-recovery" aria-labelledby="garmin-recovery-heading">
-          <span class="eyebrow">Erholung &amp; Cardio</span>
           <h3 id="garmin-recovery-heading">Dein Trainingszustand</h3>
           <p class="planner-note">App-Einschätzung aus Garmin Body Battery und Tagesstress. Garmins direkter Trainingszustand und Training Readiness sind über die Personal API nicht verfügbar.</p>
           <dl class="garmin-totals"><div><dt>Body Battery</dt><dd id="garmin-battery">–</dd></div><div><dt>Ø Tagesstress</dt><dd id="garmin-stress">–</dd></div></dl>
@@ -324,7 +333,7 @@
       <section class="card library-panel"><h2>Deine Woche</h2><p id="cardio-week-date" class="planner-note"></p><dl class="strength-totals"><div><dt>Aktive Minuten</dt><dd id="cardio-minutes">0</dd></div><div><dt>Kilometer</dt><dd id="cardio-distance">0</dd></div></dl><div id="cardio-chart" class="activity-chart" aria-label="Aktivitätsminuten pro Wochentag"></div></section>
     </section>
     <section id="mobility-view" hidden>
-      <section class="card library-panel"><span class="eyebrow">Deine tägliche Routine</span><h2>Mehr Bewegung.<br>Ein paar Minuten für dich.</h2><p class="planner-note">Eine kurze Routine für Schultern, Rücken, Hüfte und Waden.</p><div class="planner-actions"><button id="mobility-start" class="plan-button primary" type="button">Routine starten</button></div><p id="mobility-status" class="planner-note" role="status"></p></section>
+      <section class="card library-panel"><h2>Tägliche Bewegungsroutine</h2><p class="planner-note">Eine kurze Routine für Schultern, Rücken, Hüfte und Waden.</p><div class="planner-actions"><button id="mobility-start" class="plan-button primary" type="button">Routine starten</button></div><p id="mobility-status" class="planner-note" role="status"></p></section>
       <div id="mobility-exercises" class="mobility-list"></div>
     </section>
     <section id="exercise-library" aria-labelledby="library-title" hidden>
@@ -457,9 +466,13 @@
     </section>
   </main>
   <template id="diary-calendar-template">
-    <div class="section-heading"><span data-calendar-selected></span><div class="calendar-actions"><button class="icon-button" type="button" aria-label="Vorherige Woche" data-calendar-prev>‹</button><span class="calendar-month"></span><button class="icon-button" type="button" aria-label="Nächste Woche" data-calendar-next>›</button></div></div>
+    <div class="diary-calendar-controls">
+      <span data-calendar-selected class="sr-only"></span>
+      <label class="date-control"><span class="sr-only">Datum wählen</span><input type="date"></label>
+      <div class="calendar-actions"><button class="icon-button" type="button" aria-label="Vorherige Woche" data-calendar-prev><svg aria-hidden="true"><use href="#icon-arrow"/></svg></button><span class="calendar-month"></span><button class="icon-button" type="button" aria-label="Nächste Woche" data-calendar-next><svg aria-hidden="true"><use href="#icon-arrow"/></svg></button></div>
+      <button class="text-button" type="button" data-calendar-today>Heute</button>
+    </div>
     <div class="week-calendar"></div>
-    <div class="calendar-footer"><label class="date-control"><span class="sr-only">Datum wählen</span><input type="date"></label><button class="text-button" type="button" data-calendar-today>Heute</button></div>
   </template>
   <nav class="bottom-nav" aria-label="Hauptnavigation" hidden>
     <div class="nav-inner">
@@ -509,7 +522,7 @@
   <dialog id="strength-workout-dialog" class="workout-page" aria-labelledby="strength-workout-title">
     <div class="workout-page-shell">
       <div class="workout-toolbar">
-        <div class="detail-header"><div><span class="eyebrow">Deine Trainingseinheit</span><h2 id="strength-workout-title">Training</h2></div><button class="plan-button" id="workout-leave" type="button" aria-label="Training pausieren und verlassen">Verlassen</button></div>
+        <div class="detail-header"><h2 id="strength-workout-title">Training</h2><button class="plan-button" id="workout-leave" type="button" aria-label="Training pausieren und verlassen">Verlassen</button></div>
         <p id="workout-scheduled-date" class="planner-note"></p>
         <div class="workout-timer-bar"><span><svg aria-hidden="true"><use href="#icon-clock"/></svg><output id="workout-elapsed" aria-label="Aktive Trainingsdauer">00:00</output></span><button class="plan-button" id="workout-pause" type="button">Pausieren</button></div>
       </div>
@@ -519,7 +532,7 @@
         <div class="workout-checkin-summary"><span id="workout-checkin-summary" class="planner-note"></span><button id="workout-checkin-edit" class="plan-button" type="button">Muskelkater &amp; Beschwerden</button></div>
         <div class="workout-progress-copy"><strong>Deine Übungen</strong><span id="workout-set-progress"></span></div>
         <progress id="workout-progress" value="0" max="1" aria-label="Absolvierte Sätze"></progress>
-        <p id="workout-order-help" class="planner-note">Tippe eine Übung an. Am Griff kannst du sie verschieben – mit der Tastatur per Pfeiltasten.</p>
+        <p id="workout-order-help" class="planner-note">Am Griff ziehen, um zu sortieren.<span class="sr-only"> Mit der Tastatur geht das per Pfeiltasten.</span></p>
         <ol id="strength-workout-exercises" class="workout-exercise-list"></ol>
         <div id="workout-replaced-history" hidden></div>
         <button id="workout-review" class="plan-button primary" type="button">Training beenden · Zusammenfassung</button>
@@ -545,11 +558,14 @@
     </div>
   </dialog>
   <dialog id="workout-exercise-dialog" aria-labelledby="workout-exercise-dialog-title">
-    <div class="detail-header"><h2 id="workout-exercise-dialog-title">Übung</h2><button id="workout-exercise-close" class="plan-button" type="button">Zur Liste</button></div>
-    <p id="workout-exercise-context" class="planner-note"></p>
-    <div class="workout-timer-bar"><span><output class="workout-elapsed-mirror" aria-label="Aktive Trainingsdauer">00:00</output></span><button id="workout-exercise-pause" class="plan-button" type="button">Pausieren</button></div>
+    <div class="workout-exercise-toolbar">
+      <div class="detail-header"><div><h2 id="workout-exercise-dialog-title">Übung</h2><p id="workout-exercise-context" class="planner-note"></p></div><button id="workout-exercise-close" class="plan-button" type="button">Zur Liste</button></div>
+      <div class="workout-exercise-timers">
+        <div class="workout-timer-bar"><span><svg aria-hidden="true"><use href="#icon-clock"/></svg><output class="workout-elapsed-mirror" aria-label="Aktive Trainingsdauer">00:00</output></span><button id="workout-exercise-pause" class="plan-button" type="button">Pausieren</button></div>
+        <button id="workout-exercise-rest" class="plan-button workout-rest" type="button" hidden><strong>Erholung <span></span></strong><small>Pause beenden</small></button>
+      </div>
+    </div>
     <p id="workout-exercise-paused" class="workout-notice" hidden>Training pausiert. Zum Erfassen von Sätzen bitte fortsetzen.</p>
-    <button id="workout-exercise-rest" class="plan-button workout-rest" type="button" hidden>Erholung <span></span> · Pause beenden</button>
     <div id="workout-exercise-content"></div>
     <p id="workout-exercise-status" class="planner-note" role="status"></p>
   </dialog>
@@ -601,7 +617,7 @@
         <form id="food-lookup-form" class="food-lookup">
           <label class="plan-editor-label">Lebensmittel oder Barcode suchen<input name="query" type="search" maxlength="80" required autocomplete="off" placeholder="z. B. Skyr oder EAN"></label>
           <div class="food-lookup-actions">
-            <button class="plan-button primary" type="submit">Suchen</button>
+            <button class="plan-button" type="submit">Suchen</button>
             <button class="plan-button" id="food-scan-open" type="button" aria-haspopup="dialog">Barcode scannen</button>
           </div>
           <p class="planner-note" id="food-lookup-status" role="status"></p>
@@ -633,7 +649,7 @@
     </div>
     <div class="nutrition-dialog-footer">
       <p class="planner-note" id="food-save-status" role="status"></p>
-      <button class="plan-button primary" id="food-submit" type="submit" form="food-form">Zum Tagebuch hinzufügen</button>
+      <button class="plan-button primary" id="food-submit" type="submit" form="food-form">Speichern</button>
       <div class="nutrition-dialog-actions" id="food-saved-actions" hidden>
         <button class="plan-button" id="food-add-more" type="button">Weitere hinzufügen</button>
         <form method="dialog"><button class="plan-button primary" type="submit">Fertig</button></form>
@@ -643,9 +659,9 @@
   <dialog id="meal-copy-dialog" class="nutrition-dialog" aria-labelledby="meal-copy-title">
     <div class="detail-header"><h2 id="meal-copy-title">Mahlzeit übernehmen</h2><form method="dialog"><button class="plan-button">Schließen</button></form></div>
     <div class="nutrition-dialog-scroll">
-      <p class="planner-note" id="meal-copy-target"></p>
+      <p class="meal-copy-destination"><span>Zieldatum</span><strong id="meal-copy-target"></strong></p>
       <form id="meal-copy-form" class="library-controls">
-        <label class="full-row">Mahlzeit vom<input name="date" type="date" required></label>
+        <label class="full-row">Vorlage vom<input name="date" type="date" required></label>
         <p class="planner-note full-row" id="meal-copy-summary" role="status"></p>
         <ul class="entry-list full-row meal-copy-preview" id="meal-copy-list" aria-label="Lebensmittel zum Übernehmen" hidden></ul>
       </form>
@@ -820,17 +836,18 @@
     </li>
   </template>
   <template id="training-template">
-    <a class="card workout">
+    <a class="card home-session" href="#krafttraining">
       <span class="icon-tile"><svg aria-hidden="true"><use href="#icon-strength"/></svg></span>
       <div class="workout-copy"><h3></h3><p></p></div>
-      <span class="workout-action"><svg aria-hidden="true"><use href="#icon-arrow"/></svg></span>
+      <span class="home-session-action"><span>Zum Training</span><svg aria-hidden="true"><use href="#icon-arrow"/></svg></span>
     </a>
   </template>
   <template id="rest-template">
-    <div class="card workout">
+    <a class="card home-session home-session-rest" href="#krafttraining">
       <span class="icon-tile"><svg aria-hidden="true"><use href="#icon-rest"/></svg></span>
       <div class="workout-copy"><h3>Ruhetag</h3><p>Heute steht kein Training auf dem Plan.</p></div>
-    </div>
+      <span class="home-session-action"><span>Trainingswoche ansehen</span><svg aria-hidden="true"><use href="#icon-arrow"/></svg></span>
+    </a>
   </template>
 </body>
 </html>
