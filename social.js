@@ -2,6 +2,7 @@ const fitnessSocial = (() => {
   const find = (id) => document.getElementById("social-" + id);
   const enableForm = find("enable"), searchForm = find("search"), shareForm = find("share-form");
   const friendDialog = find("friend-dialog"), shareDialog = find("share-dialog");
+  const accountDialog = document.querySelector("#account-dialog"), settings = find("settings");
   const categoryFields = [...find("categories").querySelectorAll("input")];
   const labels = { strength: "Krafttraining", cardio: "Cardio", nutrition: "Ernährung" };
   const dayFormat = new Intl.DateTimeFormat("de-DE", { day: "numeric", month: "short", year: "numeric" });
@@ -51,7 +52,8 @@ const fitnessSocial = (() => {
   }
 
   function workoutLine(workout) {
-    return workout.name + " · " + prettyDate(workout.date) + " · " + workout.minutes + " Min. · " + workout.sets + " Sätze";
+    const sets = workout.sets === 1 ? "Satz" : "Sätze";
+    return `${workout.name} · ${prettyDate(workout.date)} · ${workout.minutes}\u00a0Min. · ${workout.sets}\u00a0${sets}`;
   }
 
   function row(title, description, actions = []) {
@@ -66,6 +68,63 @@ const fitnessSocial = (() => {
       item.append(controls);
     }
     return item;
+  }
+
+  function friendHandles(state) {
+    return (state?.connections ?? []).filter(({ status }) => status === "friend").map(({ handle }) => handle);
+  }
+
+  function renderActivity(ctx) {
+    const state = ctx?.state, activity = ctx?.activity;
+    const enabled = state?.profile?.enabled === true;
+    const friends = new Set(friendHandles(state));
+    const entries = enabled && !ctx.loadError
+      ? (activity?.entries ?? []).filter(({ handle }) => friends.has(handle)) : [];
+    const list = find("activity-list");
+    list.replaceChildren(...entries.map((workout) => row(workout.handle, workoutLine(workout))));
+    list.hidden = !entries.length;
+    find("activity-context").hidden = !entries.length;
+
+    let message = "";
+    if (ctx?.loadError) message = ctx.message;
+    else if (!state) message = "Aktivitäten werden geladen …";
+    else if (!enabled) message = "Schalte Social ein, um geteilte Trainings deiner Freunde zu sehen.";
+    else if (!friends.size) message = "Füge Freunde hinzu. Trainings, die sie mit dir teilen, erscheinen hier.";
+    else if (activity?.failed) message = entries.length
+      ? "Einige Aktivitäten konnten gerade nicht geladen werden." : "Aktivitäten konnten gerade nicht geladen werden.";
+    else if (!entries.length) message = !activity || activity.loading
+      ? "Aktivitäten werden geladen …" : "Deine Freunde haben noch keine Trainings mit dir geteilt.";
+    find("activity-status").textContent = message;
+    find("open-settings").hidden = !state || enabled || Boolean(ctx?.loadError);
+    find("activity-retry").hidden = !ctx?.loadError && !activity?.failed;
+  }
+
+  async function refreshActivity(ctx) {
+    if (ctx !== context || ctx.busy || ctx.loadError || location.hash !== "#social" || !ctx.state?.profile?.enabled) return;
+    const handles = friendHandles(ctx.state);
+    if (!handles.length) return;
+    const key = handles.join("\n");
+    if (ctx.activity?.key === key && ctx.activity.loading) return;
+    const activity = { key, entries: ctx.activity?.entries ?? [], loading: true };
+    ctx.activity = activity;
+    renderActivity(ctx);
+
+    const entries = [];
+    const { from } = week();
+    for (let start = 0; start < handles.length; start += 4) {
+      const results = await Promise.allSettled(handles.slice(start, start + 4)
+        .map((handle) => request(ctx, "friend", { handle, week: from })));
+      if (ctx !== context || activity !== ctx.activity) return;
+      for (const result of results) {
+        if (result.status === "fulfilled") {
+          const { handle, shares } = result.value;
+          entries.push(...shares.map((workout) => ({ ...workout, handle })));
+        } else if (result.reason.status !== 404) activity.failed = true;
+      }
+    }
+    activity.entries = entries.sort((left, right) => right.date.localeCompare(left.date)).slice(0, 5);
+    activity.loading = false;
+    renderActivity(ctx);
   }
 
   function renderConnections(ctx) {
@@ -101,13 +160,16 @@ const fitnessSocial = (() => {
     enableForm.hidden = !state || Boolean(profile);
     find("profile").hidden = !profile;
     find("handle").textContent = profile?.handle ?? "";
+    find("enabled-state").textContent = enabled ? "Social ist eingeschaltet" : "Social ist ausgeschaltet";
     find("toggle").textContent = enabled ? "Social ausschalten" : "Social wieder einschalten";
     find("toggle").disabled = Boolean(ctx?.busy);
     find("categories").hidden = !enabled;
     find("categories").disabled = Boolean(ctx?.busy);
+    find("shared").hidden = !enabled;
     find("content").hidden = !enabled;
     find("retry").hidden = !ctx?.loadError;
-    find("status").textContent = ctx?.message ?? "";
+    find("status").textContent = ctx?.loadError || (accountDialog.open && settings.open) ? "" : ctx?.message ?? "";
+    find("settings-status").textContent = ctx?.message ?? "";
     find("sync-status").textContent = enabled ? ctx.syncMessage ?? "" : "";
     for (const field of categoryFields) field.checked = profile?.categories[field.name] === true;
     for (const form of [enableForm, searchForm, shareForm]) {
@@ -118,6 +180,8 @@ const fitnessSocial = (() => {
     strengthDashboard.setSocialShare(sharing ? openShare : null);
     if (!enabled && friendDialog.open) friendDialog.close();
     if (!sharing && shareDialog.open) shareDialog.close();
+    if (ctx && !enabled) ctx.activity = undefined;
+    renderActivity(ctx);
     if (!ctx || !enabled) {
       for (const id of ["match", "connections", "shares"]) find(id).replaceChildren();
       return;
@@ -140,6 +204,7 @@ const fitnessSocial = (() => {
   function applyState(ctx, state) {
     if (ctx !== context) return;
     ctx.loadError = false;
+    if (ctx.activity && ctx.activity.key !== friendHandles(state).join("\n")) ctx.activity = undefined;
     ctx.state = state;
     render();
     queueStats();
@@ -157,11 +222,13 @@ const fitnessSocial = (() => {
     } catch (error) {
       if (ctx === context && !ctx.busy) {
         ctx.loadError = true;
+        ctx.activity = undefined;
         ctx.message = error.message;
         render();
       }
     } finally {
       ctx.loading = false;
+      refreshActivity(ctx);
     }
   }
 
@@ -194,7 +261,10 @@ const fitnessSocial = (() => {
       return false;
     } finally {
       ctx.busy = false;
-      if (ctx === context) render();
+      if (ctx === context) {
+        render();
+        if (action !== "find") refreshActivity(ctx);
+      }
     }
   }
 
@@ -303,9 +373,9 @@ const fitnessSocial = (() => {
     selectedWorkout = strengthDashboard.getSocialWorkouts().find((entry) => entry.id === id);
     if (!selectedWorkout) return;
     find("share-preview").textContent = workoutLine(selectedWorkout);
-    const friends = ctx.state.connections.filter(({ status }) => status === "friend");
+    const friends = friendHandles(ctx.state);
     find("share-status").textContent = friends.length ? "" : "Füge zuerst im Social-Bereich Freunde hinzu.";
-    find("recipients").replaceChildren(...friends.map(({ handle }) => {
+    find("recipients").replaceChildren(...friends.map((handle) => {
       const label = element("label");
       const input = element("input");
       input.type = "checkbox";
@@ -318,7 +388,10 @@ const fitnessSocial = (() => {
 
   enableForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (await perform("enable", { name: enableForm.elements.name.value }, "Social ist eingeschaltet.")) enableForm.reset();
+    if (await perform("enable", { name: enableForm.elements.name.value }, "Social ist eingeschaltet.")) {
+      enableForm.reset();
+      if (accountDialog.open && settings.open) find("toggle").focus({ preventScroll: true });
+    }
   });
   find("toggle").addEventListener("click", async ({ currentTarget }) => {
     const ctx = context, profile = ctx?.state?.profile;
@@ -350,7 +423,7 @@ const fitnessSocial = (() => {
     let message = "Nutzername kopiert.";
     try { await navigator.clipboard.writeText(handle); }
     catch { message = "Markiere deinen Nutzernamen, um ihn zu kopieren."; }
-    if (ctx === context) find("status").textContent = ctx.message = message;
+    if (ctx === context) find("settings-status").textContent = ctx.message = message;
   });
   searchForm.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -377,11 +450,27 @@ const fitnessSocial = (() => {
     }
   });
   find("retry").addEventListener("click", () => reload());
-  find("account-link").addEventListener("click", () => document.querySelector("#account-dialog").close());
+  find("activity-retry").addEventListener("click", () => reload());
+  find("open-settings").addEventListener("click", () => {
+    settings.open = true;
+    accountDialog.showModal();
+    settings.querySelector("summary").focus();
+  });
+  settings.addEventListener("toggle", () => {
+    if (settings.open && accountDialog.open) reload();
+  });
+  accountDialog.addEventListener("close", () => {
+    if (!accountDialog.open) settings.open = false;
+  });
   for (const name of ["fitness:workoutchange", "fitness:dailychange", "fitness:garminchange"]) document.addEventListener(name, queueStats);
   window.addEventListener("hashchange", () => {
-    if (location.hash === "#social") reload();
-    else if (friendDialog.open) friendDialog.close();
+    if (location.hash === "#social") {
+      renderActivity(context);
+      reload();
+    } else {
+      if (context) context.activity = undefined;
+      if (friendDialog.open) friendDialog.close();
+    }
     if (location.hash !== "#krafttraining" && shareDialog.open) shareDialog.close();
   });
   window.addEventListener("focus", () => {
@@ -390,7 +479,10 @@ const fitnessSocial = (() => {
     queueStats();
   });
   window.setInterval(() => {
-    if (!document.hidden) refreshFriend();
+    if (!document.hidden) {
+      if (location.hash === "#social") reload();
+      refreshFriend();
+    }
     queueStats();
   }, 30000);
 

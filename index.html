@@ -90,7 +90,7 @@
   <main class="shell" id="main" hidden>
     <header class="page-header">
       <div class="header-title"><h1 id="page-title" tabindex="-1">Dashboard</h1><span id="training-state" class="training-state" hidden>Wochenplan</span><time id="today"></time></div>
-      <div class="header-actions"><span class="header-streak" id="app-streak" title="Trainingstage in Folge"><svg aria-hidden="true"><use href="#icon-flame"/></svg><strong id="app-streak-count">0</strong></span><button class="icon-button" id="profile-open" type="button" aria-label="Konto und gespeicherte Pläne" aria-haspopup="dialog"><svg aria-hidden="true"><use href="#icon-settings"/></svg></button></div>
+      <div class="header-actions"><span class="header-streak" id="app-streak" title="Trainingstage in Folge"><svg aria-hidden="true"><use href="#icon-flame"/></svg><strong id="app-streak-count">0</strong></span><button class="icon-button" id="profile-open" type="button" aria-label="Konto und Einstellungen" aria-haspopup="dialog"><svg aria-hidden="true"><use href="#icon-settings"/></svg></button></div>
     </header>
     <div id="home-view">
       <div class="home-today">
@@ -422,47 +422,26 @@
       <div id="plan-result" tabindex="-1"></div>
     </section>
     <section id="social-view" aria-label="Freunde" hidden>
-      <section class="card library-panel" aria-labelledby="social-settings-title">
-        <h2 id="social-settings-title">Deine Social-Einstellungen</h2>
-        <p class="planner-note">Du entscheidest, welche Statistiken deine bestätigten Freunde sehen.</p>
-        <form id="social-enable" class="library-controls" hidden>
-          <label>Dein Name <input name="name" required minlength="3" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" autocomplete="off" aria-describedby="social-name-hint"></label>
-          <p class="planner-note" id="social-name-hint">3–20 Buchstaben (A–Z), Ziffern oder Unterstriche. Die App ergänzt vier Ziffern, zum Beispiel Pascal#1298.</p>
-          <button class="plan-button primary" type="submit">Social einschalten</button>
-        </form>
-        <div id="social-profile" hidden>
-          <div class="social-handle"><strong id="social-handle"></strong><button class="plan-button" id="social-copy" type="button">Kopieren</button></div>
-          <fieldset id="social-categories" class="training-days" hidden>
-            <legend>Für bestätigte Freunde freigeben</legend>
-            <div class="plan-equipment-options">
-              <label><input type="checkbox" name="strength">Krafttraining</label>
-              <label><input type="checkbox" name="cardio">Cardio</label>
-              <label><input type="checkbox" name="nutrition">Ernährung</label>
-            </div>
-            <p class="planner-note">Wochenstatistiken werden von Geräten aktualisiert, auf denen du angemeldet bist. Krafttraining erlaubt zusätzlich das gezielte Teilen einzelner Einheiten.</p>
-          </fieldset>
-          <div class="planner-actions"><button class="plan-button" id="social-toggle" type="button"></button></div>
+      <section class="card library-panel" aria-labelledby="social-activity-title">
+        <h2 id="social-activity-title">Letzte Aktivitäten</h2>
+        <p id="social-activity-context" class="planner-note" hidden>Mit dir geteilte Krafttrainings</p>
+        <p id="social-activity-status" class="planner-note" role="status"></p>
+        <ul id="social-activity-list" class="entry-list" aria-label="Mit dir geteilte Trainings von Freunden" hidden></ul>
+        <div class="planner-actions social-activity-actions">
+          <button class="plan-button primary" id="social-open-settings" type="button" aria-haspopup="dialog" hidden>Social-Einstellungen</button>
+          <button class="plan-button" id="social-activity-retry" type="button" hidden>Aktivitäten neu laden</button>
         </div>
-        <button class="plan-button" id="social-retry" type="button" hidden>Erneut laden</button>
-        <p id="social-status" class="planner-note" role="status"></p>
-        <p id="social-sync-status" class="planner-note" role="status"></p>
       </section>
-      <div id="social-content" hidden>
-        <section class="card library-panel" aria-labelledby="social-friends-title">
-          <h2 id="social-friends-title">Freunde</h2>
-          <form id="social-search" class="library-controls">
-            <label>Vollständiger Nutzername <input name="handle" required maxlength="25" pattern="[A-Za-z0-9_]{3,20}#[0-9]{4}" placeholder="Pascal#1298" autocomplete="off" autocapitalize="off"></label>
-            <button class="plan-button" type="submit">Profil suchen</button>
-          </form>
-          <ul id="social-match" class="entry-list" aria-label="Suchergebnis" hidden></ul>
-          <div id="social-connections"></div>
-        </section>
-        <section class="card library-panel" aria-labelledby="social-shares-title">
-          <h2 id="social-shares-title">Deine geteilten Trainings</h2>
-          <p class="planner-note" id="social-shares-empty"></p>
-          <ul id="social-shares" class="entry-list"></ul>
-        </section>
-      </div>
+      <section id="social-content" class="card library-panel" aria-labelledby="social-friends-title" hidden>
+        <h2 id="social-friends-title">Freunde hinzufügen</h2>
+        <form id="social-search" class="library-controls">
+          <label>Vollständiger Nutzername <input name="handle" required maxlength="25" pattern="[A-Za-z0-9_]{3,20}#[0-9]{4}" placeholder="Pascal#1298" autocomplete="off" autocapitalize="off"></label>
+          <button class="plan-button" type="submit">Profil suchen</button>
+        </form>
+        <p id="social-status" class="planner-note" role="status"></p>
+        <ul id="social-match" class="entry-list" aria-label="Suchergebnis" hidden></ul>
+        <div id="social-connections"></div>
+      </section>
     </section>
   </main>
   <template id="diary-calendar-template">
@@ -570,7 +549,44 @@
     <p id="workout-exercise-status" class="planner-note" role="status"></p>
   </dialog>
   <button id="active-workout" class="active-workout" type="button" hidden><span class="live-dot"></span><span><strong>Training läuft</strong><small id="active-workout-name"></small></span><svg aria-hidden="true"><use href="#icon-arrow"/></svg></button>
-  <dialog id="account-dialog" aria-labelledby="account-dialog-title"><div class="detail-header"><h2 id="account-dialog-title">Dein Konto</h2><form method="dialog"><button class="plan-button" type="submit">Schließen</button></form></div><div class="planner-actions"><button class="plan-button" id="daily-open" type="button" aria-haspopup="dialog">Schritte &amp; Tagesziele</button><a href="#social" class="plan-button" id="social-account-link">Social-Einstellungen</a></div></dialog>
+  <dialog id="account-dialog" aria-labelledby="account-dialog-title">
+    <div class="detail-header"><h2 id="account-dialog-title">Konto und Einstellungen</h2><form method="dialog"><button class="plan-button" type="submit">Schließen</button></form></div>
+    <div class="planner-actions"><button class="plan-button" id="daily-open" type="button" aria-haspopup="dialog">Schritte &amp; Tagesziele</button></div>
+    <details id="social-settings" class="account-social-settings">
+      <summary>Social-Einstellungen</summary>
+      <div class="social-settings-content">
+        <form id="social-enable" class="library-controls" hidden>
+          <label>Dein Name <input name="name" required minlength="3" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" autocomplete="off" aria-describedby="social-name-hint"></label>
+          <p class="planner-note" id="social-name-hint">3–20 Buchstaben (A–Z), Ziffern oder Unterstriche. Die App ergänzt vier Ziffern, zum Beispiel Pascal#1298.</p>
+          <button class="plan-button primary" type="submit">Social einschalten</button>
+        </form>
+        <div id="social-profile" hidden>
+          <div class="social-setting-row"><strong id="social-enabled-state"></strong><button class="plan-button" id="social-toggle" type="button"></button></div>
+          <div class="social-setting-row social-handle">
+            <div><p class="planner-note">Dein Nutzername</p><strong id="social-handle"></strong></div>
+            <button class="plan-button" id="social-copy" type="button">Kopieren</button>
+          </div>
+          <fieldset id="social-categories" class="training-days" hidden>
+            <legend>Mit Freunden teilen</legend>
+            <div class="plan-equipment-options">
+              <label><input type="checkbox" name="strength">Krafttraining</label>
+              <label><input type="checkbox" name="cardio">Cardio</label>
+              <label><input type="checkbox" name="nutrition">Ernährung</label>
+            </div>
+            <p class="planner-note">Deine bestätigten Freunde sehen die freigegebenen Wochenstatistiken. Für Krafttraining kannst du auch einzelne Einheiten gezielt teilen.</p>
+          </fieldset>
+          <details id="social-shared" class="social-shared" hidden>
+            <summary>Deine geteilten Trainings</summary>
+            <p class="planner-note" id="social-shares-empty"></p>
+            <ul id="social-shares" class="entry-list"></ul>
+          </details>
+        </div>
+        <button class="plan-button" id="social-retry" type="button" hidden>Erneut laden</button>
+        <p id="social-settings-status" class="planner-note" role="status"></p>
+        <p id="social-sync-status" class="planner-note" role="status"></p>
+      </div>
+    </details>
+  </dialog>
   <dialog id="social-friend-dialog" aria-labelledby="social-friend-title">
     <div class="detail-header"><h2 id="social-friend-title"></h2><form method="dialog"><button class="plan-button" type="submit" autofocus>Schließen</button></form></div>
     <p id="social-friend-week" class="planner-note"></p>

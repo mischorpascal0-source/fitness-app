@@ -741,17 +741,35 @@ a.plan-button { display: inline-flex; align-items: center; text-decoration: none
 .entry-list small { color: var(--muted); font-size: var(--text-small); }
 .entry-list .icon-button { background: transparent; }
 
-#social-view:not([hidden]), #social-content:not([hidden]), #social-connections {
+#social-view:not([hidden]), #social-connections {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
 }
+#social-search, #social-enable { grid-template-columns: minmax(0, 1fr); }
+:is(#social-search, #social-enable) input { padding-inline-start: var(--space-3); }
+#social-connections:not(:empty) { margin-top: var(--space-5); }
+#social-connections .entry-list:empty { display: none; }
 #social-view h2, #social-view h3, #social-friend-dialog h2 { overflow-wrap: anywhere; }
-#social-view .entry-list li { flex-wrap: wrap; }
-#social-view .entry-list li > div:first-child { flex-basis: 9rem; }
-.social-handle { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); margin-block: var(--space-3); overflow-wrap: anywhere; }
+:is(#social-view, #social-settings) .entry-list li { flex-wrap: wrap; }
+:is(#social-view, #social-settings) .entry-list li > div:first-child { flex-basis: 9rem; }
+:is(#social-view, #social-settings) .planner-note:not(:empty) { margin-top: var(--space-2); }
+.social-activity-actions:not(:has(button:not([hidden]))) { display: none; }
+#account-dialog-title { overflow-wrap: anywhere; }
+.account-social-settings { margin-block: var(--space-3) var(--space-4); border-block: 1px solid var(--border); }
+:is(.account-social-settings, .social-shared) > summary {
+  min-height: 2.75rem;
+  align-content: center;
+  cursor: pointer;
+  font-weight: 650;
+}
+.social-settings-content { padding-bottom: var(--space-4); }
+.social-setting-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
+.social-handle { overflow-wrap: anywhere; }
+.social-handle > div { min-width: 0; }
+.social-shared, #social-retry { margin-top: var(--space-3); }
 .social-row-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
-#social-view .social-row-actions { display: flex; justify-content: flex-start; }
+:is(#social-view, #social-settings) .social-row-actions { display: flex; flex: 0 1 auto; overflow-wrap: normal; }
 .social-stats { grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); }
 #social-share-preview, #social-recipients label { overflow-wrap: anywhere; min-width: 0; }
 .date-control input { min-width: 0; max-width: 9rem; min-height: 2.75rem; padding: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--raised); color: var(--text); font: inherit; font-size: var(--text-small); }
@@ -1235,7 +1253,7 @@ a.plan-button { display: inline-flex; align-items: center; text-decoration: none
   .session-card { padding: var(--space-5); }
   #nutrition-view:not([hidden]) { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
   .meal-overview { grid-column: 1 / -1; }
-  #statistics-view > [role="tabpanel"]:not([hidden]), #social-content:not([hidden]) { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  #statistics-view > [role="tabpanel"]:not([hidden]), #social-view:has(#social-content:not([hidden])) { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
